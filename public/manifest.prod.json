@@ -1,13 +1,21 @@
 {
   "manifest_version": 3,
-  "name": "Chrome Extension Starter Kit",
-  "short_name": "Chrome Extension Starter Kit",
-  "version": "0.3.0",
-  "description": "",
+  "name": "HTTP Actions - Webページの情報を使ってAPIを呼び出す",
+  "short_name": "HTTP Actions",
+  "version": "0.0.1",
+  "description": "Chromeのコンテキストメニューやポップアップから任意のHTTP Requestを送信できる拡張機能",
   "icons": {
     "48": "icons/icon.png"
   },
-  "permissions": ["storage"],
+  "permissions": [
+    "storage",
+    "contextMenus",
+    "notifications",
+    "tabs"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "action": {
     "default_popup": "popup.html"
   },
