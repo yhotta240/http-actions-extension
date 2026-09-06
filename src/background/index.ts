@@ -136,9 +136,7 @@ async function executeActionById(
     return undefined;
   }
 
-  const result = await executeHttpAction(action, pageContext, {
-    executeRequest: executePreparedRequestInOffscreen,
-  });
+  const result = await executeHttpAction(action, pageContext, executePreparedRequestInOffscreen);
   showExecutionNotification(result);
   return result;
 }

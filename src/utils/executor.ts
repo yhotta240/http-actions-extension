@@ -20,10 +20,6 @@ export interface PreparedHttpRequest {
 
 export type PreparedRequestExecutor = (request: PreparedHttpRequest) => Promise<ExecutionResult>;
 
-export interface ExecuteHttpActionOptions {
-  executeRequest?: PreparedRequestExecutor;
-}
-
 function normalizeTimeoutMs(value: unknown): number | undefined {
   return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : undefined;
 }
@@ -157,13 +153,13 @@ function logExecutionResult(action: HttpAction, result: ExecutionResult): void {
 export async function executeHttpAction(
   action: HttpAction,
   pageContext: ExecutionPageContext = {},
-  options: ExecuteHttpActionOptions = {},
+  executeRequest: PreparedRequestExecutor,
 ): Promise<ExecutionResult> {
   const request = await prepareHttpRequest(action, pageContext);
   let result: ExecutionResult;
 
   try {
-    result = await (options.executeRequest ?? executePreparedHttpRequest)(request);
+    result = await executeRequest(request);
   } catch (err: unknown) {
     result = {
       actionId: action.id,
