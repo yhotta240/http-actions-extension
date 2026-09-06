@@ -1,5 +1,5 @@
 export type LogLevel = "info" | "warn" | "error";
-export type LogSource = "popup" | "background" | "content";
+export type LogSource = "popup" | "background";
 
 export interface LogEntry {
   message: string;
