@@ -232,11 +232,11 @@ export function setupActionEditor(
     const row = document.createElement("div");
     row.className = "input-group input-group-sm action-input-row";
     row.innerHTML = `
-      <input type="text" class="form-control font-monospace action-input-key" placeholder="ID (例: userId / ユーザーID)" required>
-      <select class="form-select action-input-type" style="max-width: 110px">
+      <select class="form-select action-input-type" style="max-width: 100px">
         <option value="text">テキスト</option>
         <option value="password">パスワード</option>
       </select>
+      <input type="text" class="form-control font-monospace action-input-key" placeholder="ID (例: userId / ユーザーID)" required>
       <div class="input-group-text" title="必須入力">
         <input class="form-check-input mt-0 action-input-required" type="checkbox" checked>
         <span class="ms-1 small">必須</span>
