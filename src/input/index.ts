@@ -78,7 +78,9 @@ function renderInputs(data: InputPageData): void {
 
   const cancelButton = actions.querySelector("#cancel") as HTMLButtonElement;
   cancelButton.addEventListener("click", () => {
-    void sendMessage({ type: "CANCEL_EXECUTION_INPUT", requestId }).finally(() => window.close());
+    void sendMessage({ type: "CANCEL_EXECUTION_INPUT", requestId })
+      .catch(() => undefined)
+      .finally(() => window.close());
   });
 
   form.addEventListener("submit", async (event) => {
