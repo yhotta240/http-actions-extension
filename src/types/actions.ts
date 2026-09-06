@@ -6,7 +6,6 @@ export type ActionInputType = "text" | "password";
 
 export interface ActionInput {
   key: string;
-  label: string;
   type: ActionInputType;
   required: boolean;
 }

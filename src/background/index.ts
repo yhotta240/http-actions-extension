@@ -208,7 +208,7 @@ async function executeActionById(
   if (missingInputs.length > 0) {
     return failedExecutionResult(
       actionId,
-      `必須入力が不足しています: ${missingInputs.map((input) => input.label).join(", ")}`,
+      `必須入力が不足しています: ${missingInputs.map((input) => input.key).join(", ")}`,
     );
   }
 
@@ -470,7 +470,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           sendResponse(
             failedExecutionResult(
               action.id,
-              `必須入力が不足しています: ${missingInputs.map((input) => input.label).join(", ")}`,
+              `必須入力が不足しています: ${missingInputs.map((input) => input.key).join(", ")}`,
             ),
           );
           return;

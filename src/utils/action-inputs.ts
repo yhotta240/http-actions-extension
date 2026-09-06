@@ -25,24 +25,21 @@ export function validateActionInputDefinitions(
 
   for (const input of inputs) {
     const key = input.key.trim();
-    if (!key) return { valid: false, error: "実行時入力のキーを入力してください" };
+    if (!key) return { valid: false, error: "実行時入力のIDを入力してください" };
     if (!ACTION_INPUT_KEY_PATTERN.test(key)) {
       return {
         valid: false,
-        error: `実行時入力のキー「${key}」には英数字，日本語，_，-のみ使用できます`,
+        error: `実行時入力のID「${key}」には英数字，日本語，_，-のみ使用できます`,
       };
     }
     if (RESERVED_ACTION_INPUT_KEYS.has(key)) {
       return {
         valid: false,
-        error: `実行時入力のキー「${key}」は予約されているため使用できません`,
+        error: `実行時入力のID「${key}」は予約されているため使用できません`,
       };
     }
     if (seenKeys.has(key)) {
-      return { valid: false, error: `実行時入力のキー「${key}」が重複しています` };
-    }
-    if (!input.label.trim()) {
-      return { valid: false, error: `実行時入力「${key}」の表示名を入力してください` };
+      return { valid: false, error: `実行時入力のID「${key}」が重複しています` };
     }
     seenKeys.add(key);
   }

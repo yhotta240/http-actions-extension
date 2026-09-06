@@ -54,7 +54,7 @@ function renderInputs(data: InputPageData): void {
     const label = document.createElement("label");
     const inputId = `action-input-${input.key}`;
     label.htmlFor = inputId;
-    label.textContent = `${input.label}${input.required ? " *" : ""}`;
+    label.textContent = `${input.key}${input.required ? " *" : ""}`;
 
     const inputElement = document.createElement("input");
     inputElement.id = inputId;

@@ -232,8 +232,7 @@ export function setupActionEditor(
     const row = document.createElement("div");
     row.className = "input-group input-group-sm action-input-row";
     row.innerHTML = `
-      <input type="text" class="form-control font-monospace action-input-key" placeholder="キー (例: userId)" required>
-      <input type="text" class="form-control action-input-label" placeholder="表示名 (例: ユーザーID)" required>
+      <input type="text" class="form-control font-monospace action-input-key" placeholder="ID (例: userId / ユーザーID)" required>
       <select class="form-select action-input-type" style="max-width: 110px">
         <option value="text">テキスト</option>
         <option value="password">パスワード</option>
@@ -248,12 +247,10 @@ export function setupActionEditor(
     `;
 
     const keyInput = row.querySelector(".action-input-key") as HTMLInputElement;
-    const labelInput = row.querySelector(".action-input-label") as HTMLInputElement;
     const typeInput = row.querySelector(".action-input-type") as HTMLSelectElement;
     const requiredInput = row.querySelector(".action-input-required") as HTMLInputElement;
 
     keyInput.value = input.key ?? "";
-    labelInput.value = input.label ?? "";
     typeInput.value = input.type ?? "text";
     requiredInput.checked = input.required ?? true;
 
@@ -266,7 +263,6 @@ export function setupActionEditor(
     actionInputsContainer.querySelectorAll(".action-input-row").forEach((row) => {
       inputs.push({
         key: (row.querySelector(".action-input-key") as HTMLInputElement).value.trim(),
-        label: (row.querySelector(".action-input-label") as HTMLInputElement).value.trim(),
         type: (row.querySelector(".action-input-type") as HTMLSelectElement)
           .value as ActionInput["type"],
         required: (row.querySelector(".action-input-required") as HTMLInputElement).checked,
