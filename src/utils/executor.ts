@@ -23,24 +23,7 @@ export type PreparedRequestExecutor = (
 ) => Promise<ExecutionResult>;
 
 export interface ExecuteHttpActionOptions {
-  keepServiceWorkerAlive?: boolean;
   executeRequest?: PreparedRequestExecutor;
-}
-
-const SERVICE_WORKER_KEEP_ALIVE_INTERVAL_MS = 20_000;
-
-function startServiceWorkerKeepAlive(): () => void {
-  const ping = () => {
-    chrome.runtime.getPlatformInfo(() => {
-      // Read lastError so Chrome does not report an unhandled runtime error
-      // if the extension is being unloaded while the heartbeat is running.
-      void chrome.runtime.lastError;
-    });
-  };
-
-  ping();
-  const intervalId = setInterval(ping, SERVICE_WORKER_KEEP_ALIVE_INTERVAL_MS);
-  return () => clearInterval(intervalId);
 }
 
 function normalizeTimeoutMs(value: unknown): number | undefined {
@@ -179,7 +162,6 @@ export async function executeHttpAction(
   options: ExecuteHttpActionOptions = {},
 ): Promise<ExecutionResult> {
   const request = await prepareHttpRequest(action, pageContext);
-  const stopKeepAlive = options.keepServiceWorkerAlive ? startServiceWorkerKeepAlive() : undefined;
   let result: ExecutionResult;
 
   try {
@@ -192,8 +174,6 @@ export async function executeHttpAction(
       error: err instanceof Error ? err.message : String(err),
       timestamp: new Date().toISOString(),
     };
-  } finally {
-    stopKeepAlive?.();
   }
 
   logExecutionResult(action, result);

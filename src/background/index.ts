@@ -141,7 +141,6 @@ async function executeActionById(
   }
 
   const result = await executeHttpAction(action, pageContext, {
-    keepServiceWorkerAlive: true,
     executeRequest: executePreparedRequestInOffscreen,
   });
   showExecutionNotification(result);
