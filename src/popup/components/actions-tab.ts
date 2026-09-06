@@ -1,14 +1,18 @@
-import type { ExecutionPageContext, ExecutionResult } from "../../types/actions";
+import type {
+  ExecutionInputRequired,
+  ExecutionPageContext,
+  ExecutionResult,
+} from "../../types/actions";
 import { getActions, setActions } from "../../utils/storage";
 
 function executeActionInBackground(
   actionId: string,
   pageContext: ExecutionPageContext,
-): Promise<ExecutionResult> {
+): Promise<ExecutionResult | ExecutionInputRequired> {
   return new Promise((resolve, reject) => {
     chrome.runtime.sendMessage(
       { type: "EXECUTE_ACTION", actionId, pageContext },
-      (response: ExecutionResult | undefined) => {
+      (response: (ExecutionResult | ExecutionInputRequired) | undefined) => {
         const runtimeError = chrome.runtime.lastError;
         if (runtimeError) {
           reject(new Error(runtimeError.message));
@@ -216,7 +220,10 @@ export function setupActionsTab(
           const result = await executeActionInBackground(action.id, pageContext);
 
           statusMsg.classList.remove("d-none");
-          if (result.success) {
+          if ("inputRequired" in result) {
+            statusMsg.className = "small text-info mt-1 border-top pt-1";
+            statusMsg.textContent = "実行入力画面を開きました";
+          } else if (result.success) {
             statusMsg.className = "small text-success mt-1 border-top pt-1";
             statusMsg.textContent = `✓ ${result.statusCode ?? 200} ${result.statusText ?? "OK"}`;
           } else {

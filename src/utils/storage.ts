@@ -125,3 +125,41 @@ export function setStorage<T extends Record<string, unknown>>(items: T): Promise
     });
   });
 }
+
+export function getSessionStorage<T extends Record<string, unknown>>(
+  keys: string | string[],
+): Promise<Partial<T>> {
+  return new Promise((resolve, reject) => {
+    chrome.storage.session.get(keys, (result) => {
+      if (chrome.runtime.lastError) {
+        reject(chrome.runtime.lastError);
+        return;
+      }
+      resolve((result ?? {}) as Partial<T>);
+    });
+  });
+}
+
+export function setSessionStorage<T extends Record<string, unknown>>(items: T): Promise<void> {
+  return new Promise((resolve, reject) => {
+    chrome.storage.session.set(items, () => {
+      if (chrome.runtime.lastError) {
+        reject(chrome.runtime.lastError);
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
+export function removeSessionStorage(keys: string | string[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    chrome.storage.session.remove(keys, () => {
+      if (chrome.runtime.lastError) {
+        reject(chrome.runtime.lastError);
+        return;
+      }
+      resolve();
+    });
+  });
+}

@@ -1,4 +1,11 @@
-import type { ActionContext, ExecutionPageContext, ExecutionResult } from "../types/actions";
+import type {
+  ActionContext,
+  ActionInput,
+  ExecutionInputRequired,
+  ExecutionPageContext,
+  ExecutionResult,
+} from "../types/actions";
+import { getMissingRequiredActionInputs } from "../utils/action-inputs";
 import {
   executeHttpAction,
   type PreparedHttpRequest,
@@ -6,10 +13,33 @@ import {
   showExecutionNotification,
 } from "../utils/executor";
 import { logError, logInfo } from "../utils/logger";
-import { ACTIONS_STORAGE_KEY, getActions, isEnabled } from "../utils/storage";
+import {
+  ACTIONS_STORAGE_KEY,
+  getActions,
+  getSessionStorage,
+  isEnabled,
+  removeSessionStorage,
+  setSessionStorage,
+} from "../utils/storage";
 
 const ROOT_MENU_ID = "http_actions_root";
 const OFFSCREEN_DOCUMENT_PATH = "offscreen.html";
+const INPUT_PAGE_PATH = "input.html";
+const PENDING_INPUT_KEY_PREFIX = "pending-input:";
+
+interface PendingInputRequest {
+  actionId: string;
+  pageContext: ExecutionPageContext;
+}
+
+interface ExecutionInputPageData {
+  success: true;
+  actionId: string;
+  actionName: string;
+  inputs: ActionInput[];
+}
+
+type ExecuteActionResponse = ExecutionResult | ExecutionInputRequired;
 
 /**
  * Maps ActionContext to Chrome ContextMenus ContextType
@@ -40,6 +70,44 @@ function failedExecutionResult(actionId: string, error: string): ExecutionResult
     error,
     timestamp: new Date().toISOString(),
   };
+}
+
+function pendingInputStorageKey(requestId: string): string {
+  return `${PENDING_INPUT_KEY_PREFIX}${requestId}`;
+}
+
+async function findActionById(actionId: string) {
+  const actions = await getActions();
+  return actions.find((item) => item.id === actionId);
+}
+
+async function openExecutionInputPage(
+  actionId: string,
+  actionName: string,
+  pageContext: ExecutionPageContext,
+): Promise<ExecutionInputRequired> {
+  const requestId = crypto.randomUUID();
+  await setSessionStorage({
+    [pendingInputStorageKey(requestId)]: {
+      actionId,
+      pageContext,
+    } satisfies PendingInputRequest,
+  });
+
+  try {
+    const inputUrl = `${chrome.runtime.getURL(INPUT_PAGE_PATH)}?requestId=${encodeURIComponent(requestId)}`;
+    await chrome.windows.create({
+      url: inputUrl,
+      type: "popup",
+      width: 460,
+      height: 560,
+    });
+  } catch (error: unknown) {
+    await removeSessionStorage(pendingInputStorageKey(requestId)).catch(() => undefined);
+    throw error;
+  }
+
+  return { inputRequired: true, requestId, actionName };
 }
 
 async function hasOffscreenDocument(): Promise<boolean> {
@@ -127,18 +195,48 @@ const executePreparedRequestInOffscreen: PreparedRequestExecutor = async (
 async function executeActionById(
   actionId: string,
   pageContext: ExecutionPageContext = {},
+  inputValues: Record<string, string> = {},
 ): Promise<ExecutionResult | undefined> {
-  const actions = await getActions();
-  const action = actions.find((item) => item.id === actionId);
+  const action = await findActionById(actionId);
 
   if (!action) {
     logError(`Action not found: ${actionId}`, "background");
     return undefined;
   }
 
-  const result = await executeHttpAction(action, pageContext, executePreparedRequestInOffscreen);
+  const missingInputs = getMissingRequiredActionInputs(action, inputValues);
+  if (missingInputs.length > 0) {
+    return failedExecutionResult(
+      actionId,
+      `必須入力が不足しています: ${missingInputs.map((input) => input.label).join(", ")}`,
+    );
+  }
+
+  const result = await executeHttpAction(
+    action,
+    pageContext,
+    inputValues,
+    executePreparedRequestInOffscreen,
+  );
   showExecutionNotification(result);
   return result;
+}
+
+async function startActionById(
+  actionId: string,
+  pageContext: ExecutionPageContext = {},
+): Promise<ExecuteActionResponse | undefined> {
+  const action = await findActionById(actionId);
+  if (!action) {
+    logError(`Action not found: ${actionId}`, "background");
+    return undefined;
+  }
+
+  if (action.inputs && action.inputs.length > 0) {
+    return openExecutionInputPage(action.id, action.name, pageContext);
+  }
+
+  return executeActionById(actionId, pageContext);
 }
 
 function createMenuItem(options: chrome.contextMenus.CreateProperties): Promise<void> {
@@ -282,7 +380,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   }
 
   // Execute
-  await executeActionById(actionId, pageContext);
+  await startActionById(actionId, pageContext);
 });
 
 // Listen for messages from popup (e.g. manual execution or menu refresh)
@@ -296,7 +394,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       return false;
     }
 
-    executeActionById(actionId, pageContext)
+    startActionById(actionId, pageContext)
       .then((result) => {
         sendResponse(result ?? failedExecutionResult(actionId, `Action not found: ${actionId}`));
       })
@@ -305,6 +403,97 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         sendResponse(failedExecutionResult(actionId, errorMsg));
       });
     return true;
+  }
+
+  if (message?.type === "GET_EXECUTION_INPUT") {
+    const requestId = typeof message.requestId === "string" ? message.requestId : "";
+    if (!requestId) {
+      sendResponse({ success: false, error: "入力リクエストIDが指定されていません" });
+      return false;
+    }
+
+    getSessionStorage<{ [key: string]: PendingInputRequest }>(pendingInputStorageKey(requestId))
+      .then(async (stored) => {
+        const pending = stored[pendingInputStorageKey(requestId)];
+        const action = pending ? await findActionById(pending.actionId) : undefined;
+        if (!pending || !action?.inputs?.length) {
+          sendResponse({ success: false, error: "実行入力の情報が見つかりません" });
+          return;
+        }
+
+        const response: ExecutionInputPageData = {
+          success: true,
+          actionId: action.id,
+          actionName: action.name,
+          inputs: action.inputs,
+        };
+        sendResponse(response);
+      })
+      .catch((error: unknown) => {
+        sendResponse({
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+    return true;
+  }
+
+  if (message?.type === "SUBMIT_EXECUTION_INPUT") {
+    const requestId = typeof message.requestId === "string" ? message.requestId : "";
+    const values = (message.values ?? {}) as Record<string, unknown>;
+    if (!requestId) {
+      sendResponse(failedExecutionResult("", "入力リクエストIDが指定されていません"));
+      return false;
+    }
+
+    getSessionStorage<{ [key: string]: PendingInputRequest }>(pendingInputStorageKey(requestId))
+      .then(async (stored) => {
+        const pending = stored[pendingInputStorageKey(requestId)];
+        if (!pending) {
+          sendResponse(failedExecutionResult("", "実行入力の有効期限が切れています"));
+          return;
+        }
+
+        const action = await findActionById(pending.actionId);
+        if (!action) {
+          sendResponse(failedExecutionResult(pending.actionId, "アクションが見つかりません"));
+          return;
+        }
+
+        const inputValues: Record<string, string> = {};
+        for (const input of action.inputs ?? []) {
+          const value = values[input.key];
+          inputValues[input.key] = typeof value === "string" ? value : "";
+        }
+        const missingInputs = getMissingRequiredActionInputs(action, inputValues);
+        if (missingInputs.length > 0) {
+          sendResponse(
+            failedExecutionResult(
+              action.id,
+              `必須入力が不足しています: ${missingInputs.map((input) => input.label).join(", ")}`,
+            ),
+          );
+          return;
+        }
+
+        await removeSessionStorage(pendingInputStorageKey(requestId));
+        const result = await executeActionById(action.id, pending.pageContext, inputValues);
+        sendResponse(result ?? failedExecutionResult(action.id, "アクションの実行に失敗しました"));
+      })
+      .catch((error: unknown) => {
+        sendResponse(
+          failedExecutionResult("", error instanceof Error ? error.message : String(error)),
+        );
+      });
+    return true;
+  }
+
+  if (message?.type === "CANCEL_EXECUTION_INPUT") {
+    const requestId = typeof message.requestId === "string" ? message.requestId : "";
+    if (requestId) {
+      removeSessionStorage(pendingInputStorageKey(requestId)).catch(() => undefined);
+    }
+    return false;
   }
 
   if (message?.type === "REFRESH_MENUS") {
