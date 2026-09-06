@@ -1,4 +1,4 @@
-import type { ActionContext, ExecutionPageContext } from "../types/actions";
+import type { ActionContext, ExecutionPageContext, ExecutionResult } from "../types/actions";
 import { executeHttpAction, showExecutionNotification } from "../utils/executor";
 import { logError, logInfo } from "../utils/logger";
 import { ACTIONS_STORAGE_KEY, getActions, isEnabled } from "../utils/storage";
@@ -23,6 +23,35 @@ function mapContextToChrome(context: ActionContext): `${chrome.contextMenus.Cont
 
 let isUpdatingMenus = false;
 let pendingUpdate = false;
+
+function failedExecutionResult(actionId: string, error: string): ExecutionResult {
+  return {
+    actionId,
+    actionName: actionId,
+    success: false,
+    error,
+    timestamp: new Date().toISOString(),
+  };
+}
+
+async function executeActionById(
+  actionId: string,
+  pageContext: ExecutionPageContext = {},
+): Promise<ExecutionResult | undefined> {
+  const actions = await getActions();
+  const action = actions.find((item) => item.id === actionId);
+
+  if (!action) {
+    logError(`Action not found: ${actionId}`, "background");
+    return undefined;
+  }
+
+  const result = await executeHttpAction(action, pageContext, {
+    keepServiceWorkerAlive: true,
+  });
+  showExecutionNotification(result);
+  return result;
+}
 
 function createMenuItem(options: chrome.contextMenus.CreateProperties): Promise<void> {
   return new Promise((resolve) => {
@@ -147,14 +176,6 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (!menuId.startsWith("action_")) return;
 
   const actionId = menuId.replace("action_", "");
-  const actions = await getActions();
-  const action = actions.find((a) => a.id === actionId);
-
-  if (!action) {
-    logError(`Action not found: ${actionId}`, "background");
-    return;
-  }
-
   // Build page context
   const pageContext: ExecutionPageContext = {
     url: tab?.url || info.pageUrl,
@@ -173,12 +194,31 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   }
 
   // Execute
-  const result = await executeHttpAction(action, pageContext);
-  showExecutionNotification(result);
+  await executeActionById(actionId, pageContext);
 });
 
 // Listen for messages from popup (e.g. manual execution or menu refresh)
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.type === "EXECUTE_ACTION") {
+    const actionId = typeof message.actionId === "string" ? message.actionId : "";
+    const pageContext = (message.pageContext ?? {}) as ExecutionPageContext;
+
+    if (!actionId) {
+      sendResponse(failedExecutionResult("", "アクションIDが指定されていません"));
+      return false;
+    }
+
+    executeActionById(actionId, pageContext)
+      .then((result) => {
+        sendResponse(result ?? failedExecutionResult(actionId, `Action not found: ${actionId}`));
+      })
+      .catch((err: unknown) => {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        sendResponse(failedExecutionResult(actionId, errorMsg));
+      });
+    return true;
+  }
+
   if (message?.type === "REFRESH_MENUS") {
     updateContextMenus()
       .then(() => sendResponse({ success: true }))

@@ -3,9 +3,30 @@ import { logError, logInfo } from "./logger";
 import { getSecrets, getVariables } from "./storage";
 import { interpolateTemplate } from "./template";
 
+export interface ExecuteHttpActionOptions {
+  keepServiceWorkerAlive?: boolean;
+}
+
+const SERVICE_WORKER_KEEP_ALIVE_INTERVAL_MS = 20_000;
+
+function startServiceWorkerKeepAlive(): () => void {
+  const ping = () => {
+    chrome.runtime.getPlatformInfo(() => {
+      // Read lastError so Chrome does not report an unhandled runtime error
+      // if the extension is being unloaded while the heartbeat is running.
+      void chrome.runtime.lastError;
+    });
+  };
+
+  ping();
+  const intervalId = setInterval(ping, SERVICE_WORKER_KEEP_ALIVE_INTERVAL_MS);
+  return () => clearInterval(intervalId);
+}
+
 export async function executeHttpAction(
   action: HttpAction,
   pageContext: ExecutionPageContext = {},
+  options: ExecuteHttpActionOptions = {},
 ): Promise<ExecutionResult> {
   const variables = await getVariables();
   const secrets = await getSecrets();
@@ -35,18 +56,38 @@ export async function executeHttpAction(
   }
 
   const timestamp = new Date().toISOString();
+  const configuredTimeoutMs = action.timeoutMs;
+  const timeoutMs =
+    typeof configuredTimeoutMs === "number" &&
+    Number.isInteger(configuredTimeoutMs) &&
+    configuredTimeoutMs > 0
+      ? configuredTimeoutMs
+      : undefined;
+  const abortController = timeoutMs === undefined ? undefined : new AbortController();
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+  let timedOut = false;
+  const stopKeepAlive = options.keepServiceWorkerAlive ? startServiceWorkerKeepAlive() : undefined;
+
+  if (abortController && timeoutMs !== undefined) {
+    timeoutHandle = setTimeout(() => {
+      timedOut = true;
+      abortController.abort();
+    }, timeoutMs);
+  }
 
   try {
     const response = await fetch(finalUrl, {
       method: action.method,
       headers: finalHeaders,
       body: action.method !== "GET" ? finalBody : undefined,
+      signal: abortController?.signal,
     });
 
     let resBodyText = "";
     try {
       resBodyText = await response.text();
     } catch {
+      if (timedOut) throw new Error("Request body read timed out");
       resBodyText = "";
     }
 
@@ -75,7 +116,11 @@ export async function executeHttpAction(
 
     return result;
   } catch (err: unknown) {
-    const errorMsg = err instanceof Error ? err.message : String(err);
+    const errorMsg = timedOut
+      ? `リクエストがタイムアウトしました (${timeoutMs}ms)`
+      : err instanceof Error
+        ? err.message
+        : String(err);
     const result: ExecutionResult = {
       actionId: action.id,
       actionName: action.name,
@@ -87,6 +132,9 @@ export async function executeHttpAction(
     logError(`✕ "${action.name}" の送信中にネットワークエラーが発生しました`, "background");
 
     return result;
+  } finally {
+    if (timeoutHandle !== undefined) clearTimeout(timeoutHandle);
+    stopKeepAlive?.();
   }
 }
 
