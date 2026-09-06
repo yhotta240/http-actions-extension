@@ -1,6 +1,7 @@
 import "./popup.css";
 import "bootstrap/js/dist/tab.js";
 import "bootstrap/js/dist/collapse.js";
+import "bootstrap/js/dist/dropdown.js";
 import { applyTheme, getTheme } from "./components/theme";
 import { PopupManager } from "./manager";
 

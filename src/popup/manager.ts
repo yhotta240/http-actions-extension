@@ -9,12 +9,15 @@ import {
   type LogLevel,
 } from "../utils/logger";
 import { getSettings, isEnabled, setEnabled, setSettings } from "../utils/storage";
+import { setupActionEditor } from "./components/action-editor";
+import { setupActionsTab } from "./components/actions-tab";
 import { setupDocumentTab } from "./components/document";
 import { setupInfoTab } from "./components/info";
 import { setupMoreMenu } from "./components/menu";
 import { PopupPanel } from "./components/panel";
 import { initShareMenu } from "./components/share";
 import { applyTheme, setupThemeMenu } from "./components/theme";
+import { setupVariablesTab } from "./components/variables-tab";
 import { setupVersionTab } from "./components/version";
 import type { ManifestMetadata, SharePlatform, Theme } from "./types";
 
@@ -25,6 +28,7 @@ export class PopupManager {
   private manifestData: chrome.runtime.Manifest;
   private manifestMetadata: ManifestMetadata;
   private enabledElement: HTMLInputElement | null;
+
   // private notificationToggle: HTMLInputElement | null;
   // private fontSizeRange: HTMLInputElement | null;
 
@@ -63,9 +67,6 @@ export class PopupManager {
       this.settings = await getSettings();
       this.enabled = await isEnabled();
       if (this.enabledElement) this.enabledElement.checked = this.enabled;
-      await this.showLog(
-        `${this.manifestData.short_name} は現在 ${this.enabled ? "有効" : "無効"} です`,
-      );
     } catch (err) {
       console.error("error", err);
       await this.showLog("設定の読み込みに失敗しました", "error", err);
@@ -182,6 +183,50 @@ export class PopupManager {
     const enabledLabel = document.getElementById("enabled-label");
     if (enabledLabel) {
       enabledLabel.textContent = `${short_name} を有効にする`;
+    }
+
+    // Set up tabs
+    const actionsListContainer = document.getElementById("actions-list-container");
+    const actionEditorContainer = document.getElementById("action-editor-container");
+    const variablesContainer = document.getElementById("variables-container");
+
+    let actionsRef: { refresh: () => Promise<void> } | null = null;
+    let editorRef: {
+      loadActionForEdit: (id: string) => Promise<void>;
+      resetForm: () => void;
+    } | null = null;
+
+    const switchTab = (tabId: string) => {
+      const tabEl = document.getElementById(tabId);
+      if (tabEl) {
+        tabEl.click();
+      }
+    };
+
+    if (actionEditorContainer) {
+      editorRef = setupActionEditor(actionEditorContainer, {
+        onSaved: () => {
+          actionsRef?.refresh();
+          switchTab("actions-tab");
+        },
+      });
+    }
+
+    if (actionsListContainer) {
+      actionsRef = setupActionsTab(actionsListContainer, (actionId) => {
+        editorRef?.loadActionForEdit(actionId);
+        switchTab("manage-tab");
+      });
+    }
+
+    const btnGotoCreate = document.getElementById("btn-goto-create");
+    btnGotoCreate?.addEventListener("click", () => {
+      editorRef?.resetForm();
+      switchTab("manage-tab");
+    });
+
+    if (variablesContainer) {
+      setupVariablesTab(variablesContainer);
     }
 
     setupMoreMenu();

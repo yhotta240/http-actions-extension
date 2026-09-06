@@ -1,6 +1,6 @@
 {
-  "name": "chrome-extension-starter-kit",
-  "version": "0.3.0",
+  "name": "http-actions-extension",
+  "version": "0.0.1",
   "description": "",
   "main": "index.js",
   "type": "module",
