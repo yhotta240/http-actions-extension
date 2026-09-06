@@ -111,7 +111,7 @@ export function setupActionsTab(
       const row = document.createElement("div");
       row.className = "d-flex align-items-center justify-content-between gap-2";
 
-      // Left info: method, name, url & context chips
+      // Left info: method, name & context chips
       const leftCol = document.createElement("div");
       leftCol.className = "d-flex flex-column flex-grow-1 overflow-hidden";
 
@@ -134,12 +134,6 @@ export function setupActionsTab(
       const subLine = document.createElement("div");
       subLine.className = "d-flex align-items-center gap-2 mt-1 text-truncate";
 
-      const urlText = document.createElement("span");
-      urlText.className = "text-muted font-monospace text-truncate";
-      urlText.style.fontSize = "0.75rem";
-      urlText.textContent = action.url;
-      urlText.title = action.url;
-
       const contextsDiv = document.createElement("div");
       contextsDiv.className = "d-flex gap-1 flex-shrink-0";
       (action.contexts || ["page"]).forEach((c) => {
@@ -150,7 +144,6 @@ export function setupActionsTab(
         contextsDiv.appendChild(cBadge);
       });
 
-      subLine.appendChild(urlText);
       subLine.appendChild(contextsDiv);
 
       leftCol.appendChild(titleLine);
