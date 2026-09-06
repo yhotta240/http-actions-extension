@@ -24,11 +24,14 @@ export async function executeHttpAction(
     finalHeaders[key] = interpolateTemplate(val, templateContext);
   }
 
+  const isJson = Object.entries(finalHeaders).some(
+    ([key, val]) => key.toLowerCase() === "content-type" && /json/i.test(val),
+  );
+
   // Body
   let finalBody: string | undefined;
   if (action.method !== "GET") {
-    // If headers indicate JSON, we can do JSON template substitution
-    finalBody = interpolateTemplate(action.body || "", templateContext);
+    finalBody = interpolateTemplate(action.body || "", templateContext, { escapeJson: isJson });
   }
 
   const timestamp = new Date().toISOString();

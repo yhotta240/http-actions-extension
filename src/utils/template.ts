@@ -10,12 +10,8 @@ export interface TemplateContext {
  * Escapes a string for safe embedding inside a JSON string literal if needed.
  */
 export function escapeJsonString(str: string): string {
-  return str
-    .replace(/\\/g, "\\\\")
-    .replace(/"/g, '\\"')
-    .replace(/\n/g, "\\n")
-    .replace(/\r/g, "\\r")
-    .replace(/\t/g, "\\t");
+  const quoted = JSON.stringify(str);
+  return quoted.slice(1, -1);
 }
 
 /**
