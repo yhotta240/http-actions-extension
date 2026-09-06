@@ -1,9 +1,19 @@
-import type { ActionContext, ExecutionPageContext, ExecutionResult } from "../types/actions";
-import { executeHttpAction, showExecutionNotification } from "../utils/executor";
+import type {
+  ActionContext,
+  ExecutionPageContext,
+  ExecutionResult,
+} from "../types/actions";
+import {
+  executeHttpAction,
+  showExecutionNotification,
+  type PreparedHttpRequest,
+  type PreparedRequestExecutor,
+} from "../utils/executor";
 import { logError, logInfo } from "../utils/logger";
 import { ACTIONS_STORAGE_KEY, getActions, isEnabled } from "../utils/storage";
 
 const ROOT_MENU_ID = "http_actions_root";
+const OFFSCREEN_DOCUMENT_PATH = "offscreen.html";
 
 /**
  * Maps ActionContext to Chrome ContextMenus ContextType
@@ -23,6 +33,8 @@ function mapContextToChrome(context: ActionContext): `${chrome.contextMenus.Cont
 
 let isUpdatingMenus = false;
 let pendingUpdate = false;
+let offscreenDocumentCreating: Promise<void> | undefined;
+let activeOffscreenRequests = 0;
 
 function failedExecutionResult(actionId: string, error: string): ExecutionResult {
   return {
@@ -33,6 +45,88 @@ function failedExecutionResult(actionId: string, error: string): ExecutionResult
     timestamp: new Date().toISOString(),
   };
 }
+
+async function hasOffscreenDocument(): Promise<boolean> {
+  const offscreenUrl = chrome.runtime.getURL(OFFSCREEN_DOCUMENT_PATH);
+
+  if ("getContexts" in chrome.runtime) {
+    const contexts = await chrome.runtime.getContexts({
+      contextTypes: ["OFFSCREEN_DOCUMENT"],
+      documentUrls: [offscreenUrl],
+    });
+    return contexts.length > 0;
+  }
+
+  const serviceWorkerClients = (
+    globalThis as typeof globalThis & {
+      clients: { matchAll: () => Promise<Array<{ url: string }>> };
+    }
+  ).clients;
+  const contexts = await serviceWorkerClients.matchAll();
+  return contexts.some((client) => client.url === offscreenUrl);
+}
+
+async function ensureOffscreenDocument(): Promise<void> {
+  if (await hasOffscreenDocument()) return;
+
+  if (!offscreenDocumentCreating) {
+    offscreenDocumentCreating = chrome.offscreen
+      .createDocument({
+        url: OFFSCREEN_DOCUMENT_PATH,
+        reasons: [chrome.offscreen.Reason.WORKERS],
+        justification: "長時間HTTPリクエストを専用Workerで実行するため",
+      })
+      .finally(() => {
+        offscreenDocumentCreating = undefined;
+      });
+  }
+
+  await offscreenDocumentCreating;
+}
+
+const executePreparedRequestInOffscreen: PreparedRequestExecutor = async (
+  request: PreparedHttpRequest,
+): Promise<ExecutionResult> => {
+  activeOffscreenRequests += 1;
+
+  try {
+    await ensureOffscreenDocument();
+
+    return await new Promise<ExecutionResult>((resolve) => {
+      chrome.runtime.sendMessage(
+        {
+          type: "EXECUTE_PREPARED_REQUEST",
+          target: "offscreen",
+          request,
+        },
+        (response: ExecutionResult | undefined) => {
+          const runtimeError = chrome.runtime.lastError;
+          if (runtimeError) {
+            resolve(
+              failedExecutionResult(
+                request.actionId,
+                runtimeError.message || "Offscreen Documentとの通信に失敗しました",
+              ),
+            );
+            return;
+          }
+          resolve(
+            response ??
+              failedExecutionResult(
+                request.actionId,
+                "Offscreen Documentから実行結果を受信できませんでした",
+              ),
+          );
+        },
+      );
+    });
+  } finally {
+    activeOffscreenRequests -= 1;
+    if (activeOffscreenRequests === 0) {
+      await chrome.offscreen.closeDocument().catch(() => undefined);
+    }
+  }
+};
 
 async function executeActionById(
   actionId: string,
@@ -48,6 +142,7 @@ async function executeActionById(
 
   const result = await executeHttpAction(action, pageContext, {
     keepServiceWorkerAlive: true,
+    executeRequest: executePreparedRequestInOffscreen,
   });
   showExecutionNotification(result);
   return result;

@@ -223,6 +223,9 @@ export function setupActionsTab(
             statusMsg.className = "small text-danger mt-1 border-top pt-1";
             statusMsg.textContent = `✕ ${result.statusCode ? `${result.statusCode} ` : ""}${result.error || result.statusText || "エラー"}`;
           }
+        } catch (err: unknown) {
+          statusMsg.className = "small text-danger mt-1 border-top pt-1";
+          statusMsg.textContent = `✕ ${err instanceof Error ? err.message : String(err)}`;
         } finally {
           runBtn.disabled = false;
           runBtn.innerHTML =
