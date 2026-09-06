@@ -476,8 +476,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           return;
         }
 
-        await removeSessionStorage(pendingInputStorageKey(requestId));
         const result = await executeActionById(action.id, pending.pageContext, inputValues);
+        if (result?.success) {
+          await removeSessionStorage(pendingInputStorageKey(requestId)).catch((error: unknown) => {
+            logError("実行入力の一時データ削除に失敗しました", "background", error);
+          });
+        }
         sendResponse(result ?? failedExecutionResult(action.id, "アクションの実行に失敗しました"));
       })
       .catch((error: unknown) => {
