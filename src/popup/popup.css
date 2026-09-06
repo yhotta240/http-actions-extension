@@ -49,6 +49,49 @@ html {
   justify-content: center;
 }
 
+.action-item-card {
+  transition: all 0.15s ease-in-out;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.action-item-card:hover {
+  border-color: rgba(13, 110, 253, 0.35);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.icon-action-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--bs-secondary);
+  transition: all 0.15s ease-in-out;
+}
+
+.icon-action-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--bs-body-color);
+}
+
+.icon-action-btn.btn-run {
+  background: rgba(13, 110, 253, 0.1);
+  color: var(--bs-primary);
+}
+
+.icon-action-btn.btn-run:hover {
+  background: var(--bs-primary);
+  color: #fff;
+}
+
+[data-bs-theme="dark"] .action-item-card {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
 #theme-button,
 #more-button {
   width: 28px;
@@ -133,4 +176,8 @@ html {
 
 svg {
   stroke: currentColor;
+}
+
+.nav-underline {
+  gap: 0.8rem;
 }
