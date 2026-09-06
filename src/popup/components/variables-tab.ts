@@ -1,5 +1,6 @@
 import type { Secrets, Variables } from "../../types/actions";
 import { getSecrets, getVariables, setSecrets, setVariables } from "../../utils/storage";
+import { isValidTemplateKey } from "../../utils/template";
 
 export function setupVariablesTab(container: HTMLElement): void {
   container.innerHTML = `
@@ -184,6 +185,10 @@ export function setupVariablesTab(container: HTMLElement): void {
     const key = newVarKey.value.trim();
     const val = newVarVal.value.trim();
     if (!key) return;
+    if (!isValidTemplateKey(key)) {
+      alert("キーには英数字，日本語，_，-，.のみ使用できます。");
+      return;
+    }
 
     const vars = await getVariables();
     vars[key] = val;
@@ -197,6 +202,10 @@ export function setupVariablesTab(container: HTMLElement): void {
     const key = newSecretKey.value.trim();
     const val = newSecretVal.value;
     if (!key) return;
+    if (!isValidTemplateKey(key)) {
+      alert("キーには英数字，日本語，_，-，.のみ使用できます。");
+      return;
+    }
 
     const secrets = await getSecrets();
     secrets[key] = val;

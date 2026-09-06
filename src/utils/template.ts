@@ -27,7 +27,7 @@ export function interpolateTemplate(
   const { page = {}, variables = {}, secrets = {} } = context;
 
   // Regex matches {{key}} or {{ key }}
-  return template.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_match, rawKey: string) => {
+  return template.replace(/\{\{\s*([\p{L}\p{N}_.-]+)\s*\}\}/gu, (_match, rawKey: string) => {
     const key = rawKey.trim();
     let value = "";
 
@@ -67,4 +67,8 @@ export function interpolateTemplate(
     }
     return value;
   });
+}
+
+export function isValidTemplateKey(key: string): boolean {
+  return /^[\p{L}\p{N}_.-]+$/u.test(key);
 }

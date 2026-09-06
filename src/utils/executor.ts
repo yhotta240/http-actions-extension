@@ -84,11 +84,7 @@ export async function executeHttpAction(
       timestamp,
     };
 
-    logError(
-      `✕ "${action.name}" の送信中にネットワークエラーが発生しました: ${errorMsg}`,
-      "background",
-      err,
-    );
+    logError(`✕ "${action.name}" の送信中にネットワークエラーが発生しました`, "background");
 
     return result;
   }

@@ -47,8 +47,16 @@ export async function addLog(
   detail?: string,
   hidden?: boolean,
 ): Promise<void> {
+  const safeMessage = redactSensitiveInfo(message);
   const safeDetail = detail ? redactSensitiveInfo(detail) : undefined;
-  const entry: LogEntry = { message, timestamp: now(), level, source, detail: safeDetail, hidden };
+  const entry: LogEntry = {
+    message: safeMessage,
+    timestamp: now(),
+    level,
+    source,
+    detail: safeDetail,
+    hidden,
+  };
   const logs = await getLogs();
   logs.push(entry);
   if (logs.length > MAX_LOG_SIZE) {
