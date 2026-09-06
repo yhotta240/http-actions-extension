@@ -64,24 +64,26 @@ export function setupActionEditor(
           </div>
         </div>
 
-        <div class="mb-2">
-          <label class="form-label small mb-1 fw-semibold">リクエストタイムアウト (ms)</label>
-          <input type="number" class="form-control form-control-sm" id="action-timeout-ms" min="1" step="1" inputmode="numeric" placeholder="空欄 = 制限なし" />
-          <small class="text-muted">空欄の場合，拡張機能側ではタイムアウトしません</small>
-        </div>
-
-        <div class="mb-3 pt-2">
-          <div class="d-flex justify-content-between align-items-center mb-1">
-            <div>
-              <label class="form-label small mb-0 fw-semibold">実行時入力</label>
-              <div class="small text-muted"><code>{{userId}}</code>のようにURL・Header・Bodyで参照します</div>
-            </div>
-            <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2 small" id="btn-add-action-input">
-              <i class="bi bi-plus-lg"></i> 項目追加
-            </button>
+        <details class="mb-2" id="action-timeout-section">
+          <summary class="small fw-semibold">リクエストタイムアウト (ms)</summary>
+          <div class="mt-2">
+            <input type="number" class="form-control form-control-sm" id="action-timeout-ms" min="1" step="1" inputmode="numeric" placeholder="空欄 = 制限なし" />
+            <small class="text-muted">空欄の場合，拡張機能側ではタイムアウトしません</small>
           </div>
-          <div id="action-inputs-container" class="d-flex flex-column gap-1"></div>
-        </div>
+        </details>
+
+        <details class="mb-3 pt-2" id="action-input-section">
+          <summary class="small fw-semibold">実行時入力</summary>
+          <div class="mt-2">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <div class="small text-muted"><code>{{userId}}</code>のようにURL・Header・Bodyで参照します</div>
+              <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2 small" id="btn-add-action-input">
+                <i class="bi bi-plus-lg"></i> 項目追加
+              </button>
+            </div>
+            <div id="action-inputs-container" class="d-flex flex-column gap-1"></div>
+          </div>
+        </details>
 
         <div class="mb-2">
           <label class="form-label small mb-1 fw-semibold">使用可能な Context (右クリック表示条件)</label>
@@ -199,6 +201,8 @@ export function setupActionEditor(
   const selectMethod = container.querySelector("#action-method") as HTMLSelectElement;
   const inputUrl = container.querySelector("#action-url") as HTMLInputElement;
   const inputTimeoutMs = container.querySelector("#action-timeout-ms") as HTMLInputElement;
+  const timeoutSection = container.querySelector("#action-timeout-section") as HTMLDetailsElement;
+  const actionInputSection = container.querySelector("#action-input-section") as HTMLDetailsElement;
   const actionInputsContainer = container.querySelector("#action-inputs-container") as HTMLElement;
   const btnAddActionInput = container.querySelector("#btn-add-action-input") as HTMLButtonElement;
 
@@ -271,7 +275,10 @@ export function setupActionEditor(
     return inputs;
   };
 
-  btnAddActionInput.addEventListener("click", () => createActionInputRow());
+  btnAddActionInput.addEventListener("click", () => {
+    actionInputSection.open = true;
+    createActionInputRow();
+  });
 
   // Toggle method-based body display
   selectMethod.addEventListener("change", () => {
@@ -539,6 +546,8 @@ export function setupActionEditor(
     createHeaderRow("Content-Type", "application/json");
 
     actionInputsContainer.innerHTML = "";
+    timeoutSection.open = false;
+    actionInputSection.open = false;
 
     bodyKvRowsContainer.innerHTML = "";
     createBodyKvRow("text", "{{selection}}");
@@ -578,9 +587,11 @@ export function setupActionEditor(
     selectMethod.value = action.method;
     inputUrl.value = action.url;
     inputTimeoutMs.value = action.timeoutMs === undefined ? "" : String(action.timeoutMs);
+    timeoutSection.open = action.timeoutMs !== undefined;
 
     actionInputsContainer.innerHTML = "";
     for (const input of action.inputs ?? []) createActionInputRow(input);
+    actionInputSection.open = (action.inputs?.length ?? 0) > 0;
 
     // Load Headers
     headersContainer.innerHTML = "";
