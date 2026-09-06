@@ -62,12 +62,12 @@ export async function executeHttpAction(
 
     if (response.ok) {
       logInfo(
-        `✓ [${response.status} ${response.statusText}] "${action.name}" を送信しました (${action.method} ${finalUrl})`,
+        `✓ [${response.status} ${response.statusText}] "${action.name}" を送信しました (${action.method} ${action.url})`,
         "background",
       );
     } else {
       logError(
-        `✕ [${response.status} ${response.statusText}] "${action.name}" の実行に失敗しました (${action.method} ${finalUrl})`,
+        `✕ [${response.status} ${response.statusText}] "${action.name}" の実行に失敗しました (${action.method} ${action.url})`,
         "background",
         { status: response.status, body: resBodyText.slice(0, 300) },
       );

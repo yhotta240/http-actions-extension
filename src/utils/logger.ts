@@ -22,6 +22,13 @@ export function now(): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
+// Redact potential secret values from log details
+function redactSensitiveInfo(text: string): string {
+  return text
+    .replace(/([?&][^=]+)=([^&\s]+)/g, "$1=REDACTED")
+    .replace(/Authorization:\s*[^\s]+/gi, "Authorization: REDACTED");
+}
+
 export function getLogs(): Promise<LogEntry[]> {
   return new Promise((resolve) => {
     chrome.storage.local.get(LOG_STORAGE_KEY, (result) => {
@@ -40,7 +47,8 @@ export async function addLog(
   detail?: string,
   hidden?: boolean,
 ): Promise<void> {
-  const entry: LogEntry = { message, timestamp: now(), level, source, detail, hidden };
+  const safeDetail = detail ? redactSensitiveInfo(detail) : undefined;
+  const entry: LogEntry = { message, timestamp: now(), level, source, detail: safeDetail, hidden };
   const logs = await getLogs();
   logs.push(entry);
   if (logs.length > MAX_LOG_SIZE) {
