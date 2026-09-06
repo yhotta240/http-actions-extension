@@ -1,5 +1,5 @@
-import type { PreparedHttpRequest } from "../utils/executor";
 import type { ExecutionResult } from "../types/actions";
+import type { PreparedHttpRequest } from "../utils/executor";
 
 interface ExecutePreparedRequestMessage {
   type: "EXECUTE_PREPARED_REQUEST";
@@ -7,7 +7,11 @@ interface ExecutePreparedRequestMessage {
   request: PreparedHttpRequest;
 }
 
-function failedExecutionResult(actionId: string, actionName: string, error: string): ExecutionResult {
+function failedExecutionResult(
+  actionId: string,
+  actionName: string,
+  error: string,
+): ExecutionResult {
   return {
     actionId,
     actionName,

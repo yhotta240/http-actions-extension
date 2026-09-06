@@ -18,9 +18,7 @@ export interface PreparedHttpRequest {
   timeoutMs?: number;
 }
 
-export type PreparedRequestExecutor = (
-  request: PreparedHttpRequest,
-) => Promise<ExecutionResult>;
+export type PreparedRequestExecutor = (request: PreparedHttpRequest) => Promise<ExecutionResult>;
 
 export interface ExecuteHttpActionOptions {
   executeRequest?: PreparedRequestExecutor;

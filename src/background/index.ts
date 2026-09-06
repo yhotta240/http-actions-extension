@@ -1,13 +1,9 @@
-import type {
-  ActionContext,
-  ExecutionPageContext,
-  ExecutionResult,
-} from "../types/actions";
+import type { ActionContext, ExecutionPageContext, ExecutionResult } from "../types/actions";
 import {
   executeHttpAction,
-  showExecutionNotification,
   type PreparedHttpRequest,
   type PreparedRequestExecutor,
+  showExecutionNotification,
 } from "../utils/executor";
 import { logError, logInfo } from "../utils/logger";
 import { ACTIONS_STORAGE_KEY, getActions, isEnabled } from "../utils/storage";
