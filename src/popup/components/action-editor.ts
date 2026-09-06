@@ -10,6 +10,15 @@ const COMMON_HEADERS = [
   "Cache-Control",
 ];
 
+type BodyScalarType = "string" | "number" | "boolean";
+
+function getBodyScalarType(value: unknown): BodyScalarType | undefined {
+  if (typeof value === "string") return "string";
+  if (typeof value === "number") return "number";
+  if (typeof value === "boolean") return "boolean";
+  return undefined;
+}
+
 export function setupActionEditor(
   container: HTMLElement,
   options: {
@@ -222,7 +231,7 @@ export function setupActionEditor(
         keys.forEach((k) => {
           const val = parsed[k];
           const strVal = typeof val === "object" ? JSON.stringify(val) : String(val ?? "");
-          createBodyKvRow(k, strVal);
+          createBodyKvRow(k, strVal, getBodyScalarType(val));
         });
         return true;
       }
@@ -271,12 +280,14 @@ export function setupActionEditor(
     const row = document.createElement("div");
     row.className = "input-group input-group-sm header-row";
     row.innerHTML = `
-      <input type="text" class="form-control font-monospace header-key" list="common-headers-list" placeholder="Key (e.g. Content-Type)" value="${key}" style="max-width: 40%;">
-      <input type="text" class="form-control font-monospace header-val" placeholder="Value (e.g. application/json)" value="${val}">
+      <input type="text" class="form-control font-monospace header-key" list="common-headers-list" placeholder="Key (e.g. Content-Type)" value="" style="max-width: 40%;">
+      <input type="text" class="form-control font-monospace header-val" placeholder="Value (e.g. application/json)" value="">
       <button type="button" class="btn btn-outline-danger btn-remove-row" title="削除">
         <i class="bi bi-x-lg"></i>
       </button>
     `;
+    (row.querySelector(".header-key") as HTMLInputElement).value = key;
+    (row.querySelector(".header-val") as HTMLInputElement).value = val;
     row.querySelector(".btn-remove-row")?.addEventListener("click", () => row.remove());
     headersContainer.appendChild(row);
   };
@@ -307,12 +318,12 @@ export function setupActionEditor(
   // ----------------
   // Body KV Rows Helper
   // ----------------
-  const createBodyKvRow = (key = "", val = "") => {
+  const createBodyKvRow = (key = "", val = "", valueType?: BodyScalarType) => {
     const row = document.createElement("div");
     row.className = "input-group input-group-sm body-kv-row";
     row.innerHTML = `
-      <input type="text" class="form-control font-monospace body-key" placeholder="Key (e.g. text)" value="${key}" style="max-width: 35%;">
-      <input type="text" class="form-control font-monospace body-val" placeholder="Value (e.g. {{selection}})" value="${val}">
+      <input type="text" class="form-control font-monospace body-key" placeholder="Key (e.g. text)" value="" style="max-width: 35%;">
+      <input type="text" class="form-control font-monospace body-val" placeholder="Value (e.g. {{selection}})" value="">
       <button type="button" class="btn btn-outline-secondary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false" title="変数を挿入">
       </button>
       <ul class="dropdown-menu dropdown-menu-end small">
@@ -329,12 +340,16 @@ export function setupActionEditor(
 
     const keyInput = row.querySelector(".body-key") as HTMLInputElement;
     const valInput = row.querySelector(".body-val") as HTMLInputElement;
+    keyInput.value = key;
+    valInput.value = val;
+    if (valueType) row.dataset.valueType = valueType;
 
     keyInput.addEventListener("input", () => {
       if (bodyMode === "kv") syncKvToRaw();
     });
 
     valInput.addEventListener("input", () => {
+      delete row.dataset.valueType;
       if (bodyMode === "kv") syncKvToRaw();
     });
 
@@ -389,7 +404,17 @@ export function setupActionEditor(
       const k = (row.querySelector(".body-key") as HTMLInputElement)?.value.trim();
       const v = (row.querySelector(".body-val") as HTMLInputElement)?.value ?? "";
       if (k) {
-        obj[k] = parseKvValue(v);
+        const valueType = (row as HTMLElement).dataset.valueType;
+        if (valueType === "string") {
+          obj[k] = v;
+        } else if (valueType === "number") {
+          const parsed = Number(v);
+          obj[k] = Number.isNaN(parsed) ? v : parsed;
+        } else if (valueType === "boolean" && (v.trim() === "true" || v.trim() === "false")) {
+          obj[k] = v.trim() === "true";
+        } else {
+          obj[k] = parseKvValue(v);
+        }
       }
     });
     return obj;
@@ -509,7 +534,8 @@ export function setupActionEditor(
           if (allSimple) {
             isSimpleKv = true;
             keys.forEach((k) => {
-              createBodyKvRow(k, String(parsed[k]));
+              const value = parsed[k];
+              createBodyKvRow(k, String(value), getBodyScalarType(value));
             });
           }
         }
