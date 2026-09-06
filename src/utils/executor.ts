@@ -27,6 +27,7 @@ function normalizeTimeoutMs(value: unknown): number | undefined {
 export async function prepareHttpRequest(
   action: HttpAction,
   pageContext: ExecutionPageContext = {},
+  inputValues: Record<string, string> = {},
 ): Promise<PreparedHttpRequest> {
   const variables = await getVariables();
   const secrets = await getSecrets();
@@ -35,6 +36,7 @@ export async function prepareHttpRequest(
     page: pageContext,
     variables,
     secrets,
+    inputs: inputValues,
   };
 
   const finalUrl = interpolateTemplate(action.url, templateContext);
@@ -153,9 +155,10 @@ function logExecutionResult(action: HttpAction, result: ExecutionResult): void {
 export async function executeHttpAction(
   action: HttpAction,
   pageContext: ExecutionPageContext = {},
+  inputValues: Record<string, string> = {},
   executeRequest: PreparedRequestExecutor,
 ): Promise<ExecutionResult> {
-  const request = await prepareHttpRequest(action, pageContext);
+  const request = await prepareHttpRequest(action, pageContext, inputValues);
   let result: ExecutionResult;
 
   try {

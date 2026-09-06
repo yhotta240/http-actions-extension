@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>実行入力</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body { font-family: system-ui, sans-serif; margin: 0; padding: 20px; min-width: 360px; }
+      h1 { font-size: 18px; margin: 0 0 4px; }
+      .muted { color: #6c757d; font-size: 13px; margin-bottom: 18px; }
+      label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; }
+      .field { margin-bottom: 14px; }
+      input { box-sizing: border-box; width: 100%; padding: 8px 10px; border: 1px solid #999; border-radius: 5px; font: inherit; }
+      .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+      button { border: 0; border-radius: 5px; padding: 8px 14px; cursor: pointer; font: inherit; }
+      #cancel { background: #6c757d; color: white; }
+      #submit { background: #0d6efd; color: white; }
+      button:disabled { opacity: .6; cursor: wait; }
+      .error { color: #dc3545; white-space: pre-wrap; margin-top: 12px; font-size: 13px; }
+      .success { color: #198754; margin-top: 12px; font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1 id="title">実行入力</h1>
+      <div id="description" class="muted">リクエスト実行に必要な値を入力してください</div>
+      <form id="input-form"></form>
+      <div id="message" role="status"></div>
+    </main>
+    <script type="module" src="input.js"></script>
+  </body>
+</html>

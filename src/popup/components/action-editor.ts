@@ -1,4 +1,5 @@
-import type { ActionContext, HttpAction, HttpMethod } from "../../types/actions";
+import type { ActionContext, ActionInput, HttpAction, HttpMethod } from "../../types/actions";
+import { validateActionInputDefinitions } from "../../utils/action-inputs";
 import { getActions, setActions } from "../../utils/storage";
 
 const COMMON_HEADERS = [
@@ -63,11 +64,26 @@ export function setupActionEditor(
           </div>
         </div>
 
-        <div class="mb-2">
-          <label class="form-label small mb-1 fw-semibold">リクエストタイムアウト (ms)</label>
-          <input type="number" class="form-control form-control-sm" id="action-timeout-ms" min="1" step="1" inputmode="numeric" placeholder="空欄 = 制限なし" />
-          <small class="text-muted">空欄の場合，拡張機能側ではタイムアウトしません</small>
-        </div>
+        <details class="mb-2" id="action-timeout-section">
+          <summary class="small fw-semibold">リクエストタイムアウト (ms)</summary>
+          <div class="mt-2">
+            <input type="number" class="form-control form-control-sm" id="action-timeout-ms" min="1" step="1" inputmode="numeric" placeholder="空欄 = 制限なし" />
+            <small class="text-muted">空欄の場合，拡張機能側ではタイムアウトしません</small>
+          </div>
+        </details>
+
+        <details class="mb-3 pt-2" id="action-input-section">
+          <summary class="small fw-semibold">実行時入力</summary>
+          <div class="mt-2">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <div class="small text-muted"><code>{{userId}}</code>のようにURL・Header・Bodyで参照します</div>
+              <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2 small" id="btn-add-action-input">
+                <i class="bi bi-plus-lg"></i> 項目追加
+              </button>
+            </div>
+            <div id="action-inputs-container" class="d-flex flex-column gap-1"></div>
+          </div>
+        </details>
 
         <div class="mb-2">
           <label class="form-label small mb-1 fw-semibold">使用可能な Context (右クリック表示条件)</label>
@@ -185,6 +201,10 @@ export function setupActionEditor(
   const selectMethod = container.querySelector("#action-method") as HTMLSelectElement;
   const inputUrl = container.querySelector("#action-url") as HTMLInputElement;
   const inputTimeoutMs = container.querySelector("#action-timeout-ms") as HTMLInputElement;
+  const timeoutSection = container.querySelector("#action-timeout-section") as HTMLDetailsElement;
+  const actionInputSection = container.querySelector("#action-input-section") as HTMLDetailsElement;
+  const actionInputsContainer = container.querySelector("#action-inputs-container") as HTMLElement;
+  const btnAddActionInput = container.querySelector("#btn-add-action-input") as HTMLButtonElement;
 
   const chkPage = container.querySelector("#ctx-page") as HTMLInputElement;
   const chkSelection = container.querySelector("#ctx-selection") as HTMLInputElement;
@@ -207,6 +227,54 @@ export function setupActionEditor(
 
   const btnInsertSelection = container.querySelector("#btn-insert-selection") as HTMLButtonElement;
   const btnInsertUrl = container.querySelector("#btn-insert-url") as HTMLButtonElement;
+
+  const createActionInputRow = (input: Partial<ActionInput> = {}) => {
+    const row = document.createElement("div");
+    row.className = "input-group input-group-sm action-input-row";
+    row.innerHTML = `
+      <select class="form-select action-input-type" style="max-width: 100px">
+        <option value="text">テキスト</option>
+        <option value="password">パスワード</option>
+      </select>
+      <input type="text" class="form-control font-monospace action-input-key" placeholder="ID (例: userId / ユーザーID)" required>
+      <div class="input-group-text" title="必須入力">
+        <input class="form-check-input mt-0 action-input-required" type="checkbox" checked>
+        <span class="ms-1 small">必須</span>
+      </div>
+      <button type="button" class="btn btn-outline-danger btn-remove-action-input" title="削除">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    `;
+
+    const keyInput = row.querySelector(".action-input-key") as HTMLInputElement;
+    const typeInput = row.querySelector(".action-input-type") as HTMLSelectElement;
+    const requiredInput = row.querySelector(".action-input-required") as HTMLInputElement;
+
+    keyInput.value = input.key ?? "";
+    typeInput.value = input.type ?? "text";
+    requiredInput.checked = input.required ?? true;
+
+    row.querySelector(".btn-remove-action-input")?.addEventListener("click", () => row.remove());
+    actionInputsContainer.appendChild(row);
+  };
+
+  const collectActionInputs = (): ActionInput[] => {
+    const inputs: ActionInput[] = [];
+    actionInputsContainer.querySelectorAll(".action-input-row").forEach((row) => {
+      inputs.push({
+        key: (row.querySelector(".action-input-key") as HTMLInputElement).value.trim(),
+        type: (row.querySelector(".action-input-type") as HTMLSelectElement)
+          .value as ActionInput["type"],
+        required: (row.querySelector(".action-input-required") as HTMLInputElement).checked,
+      });
+    });
+    return inputs;
+  };
+
+  btnAddActionInput.addEventListener("click", () => {
+    actionInputSection.open = true;
+    createActionInputRow();
+  });
 
   // Toggle method-based body display
   selectMethod.addEventListener("change", () => {
@@ -473,6 +541,10 @@ export function setupActionEditor(
     headersContainer.innerHTML = "";
     createHeaderRow("Content-Type", "application/json");
 
+    actionInputsContainer.innerHTML = "";
+    timeoutSection.open = false;
+    actionInputSection.open = false;
+
     bodyKvRowsContainer.innerHTML = "";
     createBodyKvRow("text", "{{selection}}");
     createBodyKvRow("url", "{{page.url}}");
@@ -511,6 +583,11 @@ export function setupActionEditor(
     selectMethod.value = action.method;
     inputUrl.value = action.url;
     inputTimeoutMs.value = action.timeoutMs === undefined ? "" : String(action.timeoutMs);
+    timeoutSection.open = action.timeoutMs !== undefined;
+
+    actionInputsContainer.innerHTML = "";
+    for (const input of action.inputs ?? []) createActionInputRow(input);
+    actionInputSection.open = (action.inputs?.length ?? 0) > 0;
 
     // Load Headers
     headersContainer.innerHTML = "";
@@ -626,6 +703,12 @@ export function setupActionEditor(
     inputTimeoutMs.setCustomValidity("");
 
     const finalHeaders = collectHeaders();
+    const actionInputs = collectActionInputs();
+    const actionInputValidation = validateActionInputDefinitions(actionInputs);
+    if (!actionInputValidation.valid) {
+      alert(actionInputValidation.error);
+      return;
+    }
 
     // Determine final body
     let finalBody = "";
@@ -658,6 +741,11 @@ export function setupActionEditor(
           body: finalBody,
           contexts,
         };
+        if (actionInputs.length === 0) {
+          delete updatedAction.inputs;
+        } else {
+          updatedAction.inputs = actionInputs;
+        }
         if (timeoutMs === undefined) {
           delete updatedAction.timeoutMs;
         } else {
@@ -676,6 +764,7 @@ export function setupActionEditor(
         contexts,
         enabled: true,
         order: actions.length,
+        ...(actionInputs.length === 0 ? {} : { inputs: actionInputs }),
         ...(timeoutMs === undefined ? {} : { timeoutMs }),
       };
       actions.push(newAction);

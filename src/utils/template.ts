@@ -4,6 +4,7 @@ export interface TemplateContext {
   page?: ExecutionPageContext;
   variables?: Variables;
   secrets?: Secrets;
+  inputs?: Record<string, string>;
 }
 
 /**
@@ -15,7 +16,7 @@ export function escapeJsonString(str: string): string {
 }
 
 /**
- * Replaces {{page.*}}, {{selection}}, {{link.url}}, {{image.url}}, {{var.*}}, and {{secret.*}} placeholders.
+ * Replaces page context, stored values, and action input placeholders.
  */
 export function interpolateTemplate(
   template: string,
@@ -24,7 +25,7 @@ export function interpolateTemplate(
 ): string {
   if (!template) return "";
 
-  const { page = {}, variables = {}, secrets = {} } = context;
+  const { page = {}, variables = {}, secrets = {}, inputs = {} } = context;
 
   // Regex matches {{key}} or {{ key }}
   return template.replace(/\{\{\s*([\p{L}\p{N}_.-]+)\s*\}\}/gu, (_match, rawKey: string) => {
@@ -57,6 +58,8 @@ export function interpolateTemplate(
     } else if (key.startsWith("secret.")) {
       const secretKey = key.slice(7);
       value = secrets[secretKey] ?? "";
+    } else if (Object.keys(inputs).includes(key)) {
+      value = inputs[key] ?? "";
     } else {
       // Unknown placeholder - leave unchanged or empty
       return _match;
