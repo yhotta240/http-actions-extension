@@ -9,6 +9,7 @@ export interface HttpAction {
   url: string;
   headers: Record<string, string>;
   body: string;
+  timeoutMs?: number;
   contexts: ActionContext[];
   enabled: boolean;
   order: number;

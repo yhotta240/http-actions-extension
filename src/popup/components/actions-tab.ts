@@ -1,6 +1,28 @@
-import type { ExecutionPageContext } from "../../types/actions";
-import { executeHttpAction, showExecutionNotification } from "../../utils/executor";
+import type { ExecutionPageContext, ExecutionResult } from "../../types/actions";
 import { getActions, setActions } from "../../utils/storage";
+
+function executeActionInBackground(
+  actionId: string,
+  pageContext: ExecutionPageContext,
+): Promise<ExecutionResult> {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage(
+      { type: "EXECUTE_ACTION", actionId, pageContext },
+      (response: ExecutionResult | undefined) => {
+        const runtimeError = chrome.runtime.lastError;
+        if (runtimeError) {
+          reject(new Error(runtimeError.message));
+          return;
+        }
+        if (!response) {
+          reject(new Error("Service Workerから実行結果を受信できませんでした"));
+          return;
+        }
+        resolve(response);
+      },
+    );
+  });
+}
 
 function getMethodBadgeClass(method: string): string {
   switch (method) {
@@ -191,8 +213,7 @@ export function setupActionsTab(
 
         try {
           const pageContext = await getActiveTabContext();
-          const result = await executeHttpAction(action, pageContext);
-          showExecutionNotification(result);
+          const result = await executeActionInBackground(action.id, pageContext);
 
           statusMsg.classList.remove("d-none");
           if (result.success) {
@@ -202,6 +223,9 @@ export function setupActionsTab(
             statusMsg.className = "small text-danger mt-1 border-top pt-1";
             statusMsg.textContent = `✕ ${result.statusCode ? `${result.statusCode} ` : ""}${result.error || result.statusText || "エラー"}`;
           }
+        } catch (err: unknown) {
+          statusMsg.className = "small text-danger mt-1 border-top pt-1";
+          statusMsg.textContent = `✕ ${err instanceof Error ? err.message : String(err)}`;
         } finally {
           runBtn.disabled = false;
           runBtn.innerHTML =

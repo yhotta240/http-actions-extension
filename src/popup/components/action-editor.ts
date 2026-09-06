@@ -64,6 +64,12 @@ export function setupActionEditor(
         </div>
 
         <div class="mb-2">
+          <label class="form-label small mb-1 fw-semibold">リクエストタイムアウト (ms)</label>
+          <input type="number" class="form-control form-control-sm" id="action-timeout-ms" min="1" step="1" inputmode="numeric" placeholder="空欄 = 制限なし" />
+          <small class="text-muted">空欄の場合，拡張機能側ではタイムアウトしません</small>
+        </div>
+
+        <div class="mb-2">
           <label class="form-label small mb-1 fw-semibold">使用可能な Context (右クリック表示条件)</label>
           <div class="d-flex gap-3 flex-wrap small">
             <div class="form-check">
@@ -178,6 +184,7 @@ export function setupActionEditor(
   const inputName = container.querySelector("#action-name") as HTMLInputElement;
   const selectMethod = container.querySelector("#action-method") as HTMLSelectElement;
   const inputUrl = container.querySelector("#action-url") as HTMLInputElement;
+  const inputTimeoutMs = container.querySelector("#action-timeout-ms") as HTMLInputElement;
 
   const chkPage = container.querySelector("#ctx-page") as HTMLInputElement;
   const chkSelection = container.querySelector("#ctx-selection") as HTMLInputElement;
@@ -471,6 +478,7 @@ export function setupActionEditor(
     createBodyKvRow("url", "{{page.url}}");
 
     inputBodyRaw.value = JSON.stringify({ text: "{{selection}}", url: "{{page.url}}" }, null, 2);
+    inputTimeoutMs.value = "";
 
     radioBodyKv.checked = true;
     bodyMode = "kv";
@@ -502,6 +510,7 @@ export function setupActionEditor(
     inputName.value = action.name;
     selectMethod.value = action.method;
     inputUrl.value = action.url;
+    inputTimeoutMs.value = action.timeoutMs === undefined ? "" : String(action.timeoutMs);
 
     // Load Headers
     headersContainer.innerHTML = "";
@@ -607,6 +616,15 @@ export function setupActionEditor(
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
+    const timeoutText = inputTimeoutMs.value.trim();
+    const timeoutMs = timeoutText ? Number(timeoutText) : undefined;
+    if (timeoutMs !== undefined && (!Number.isInteger(timeoutMs) || timeoutMs <= 0)) {
+      inputTimeoutMs.setCustomValidity("1以上の整数を入力してください");
+      inputTimeoutMs.reportValidity();
+      return;
+    }
+    inputTimeoutMs.setCustomValidity("");
+
     const finalHeaders = collectHeaders();
 
     // Determine final body
@@ -631,7 +649,7 @@ export function setupActionEditor(
     if (currentEditingId) {
       const idx = actions.findIndex((a) => a.id === currentEditingId);
       if (idx !== -1) {
-        actions[idx] = {
+        const updatedAction: HttpAction = {
           ...actions[idx],
           name: inputName.value.trim(),
           method: selectMethod.value as HttpMethod,
@@ -640,6 +658,12 @@ export function setupActionEditor(
           body: finalBody,
           contexts,
         };
+        if (timeoutMs === undefined) {
+          delete updatedAction.timeoutMs;
+        } else {
+          updatedAction.timeoutMs = timeoutMs;
+        }
+        actions[idx] = updatedAction;
       }
     } else {
       const newAction: HttpAction = {
@@ -652,6 +676,7 @@ export function setupActionEditor(
         contexts,
         enabled: true,
         order: actions.length,
+        ...(timeoutMs === undefined ? {} : { timeoutMs }),
       };
       actions.push(newAction);
     }

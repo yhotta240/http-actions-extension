@@ -14,6 +14,8 @@ export default defineConfig(({ mode }) => {
   const bgEntry = isDev
     ? r("./src/background/dev.ts")
     : r("./src/background/index.ts");
+  const offscreenEntry = r("./src/offscreen/index.ts");
+  const offscreenWorkerEntry = r("./src/offscreen/worker.ts");
 
   return {
     publicDir: false,
@@ -33,6 +35,8 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         input: {
           background: bgEntry,
+          offscreen: offscreenEntry,
+          "offscreen-worker": offscreenWorkerEntry,
         },
         output: {
           entryFileNames: "[name].js",
@@ -61,6 +65,7 @@ export default defineConfig(({ mode }) => {
       viteStaticCopy({
         targets: [
           { src: "public/popup.html", dest: ".", rename: { stripBase: 1 } },
+          { src: "public/offscreen.html", dest: ".", rename: { stripBase: 1 } },
           { src: "public/manifest.meta.json", dest: ".", rename: { stripBase: 1 } },
           { src: "public/icons", dest: ".", rename: { stripBase: 1 } },
           {
