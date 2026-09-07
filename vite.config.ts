@@ -1,4 +1,5 @@
 import { defineConfig } from "vite";
+import { readFileSync } from "node:fs";
 import { fileURLToPath, URL } from "node:url";
 import { viteStaticCopy } from "vite-plugin-static-copy";
 import { markdownPlugin } from "./scripts/plugins/markdown.ts";
@@ -65,7 +66,16 @@ export default defineConfig(({ mode }) => {
 
       viteStaticCopy({
         targets: [
-          { src: "public/popup.html", dest: ".", rename: { stripBase: 1 } },
+          {
+            src: "public/popup.html",
+            dest: ".",
+            rename: { stripBase: 1 },
+            transform: (html) =>
+              html.replace(
+                "</head>",
+                `<style>${readFileSync(r("./src/popup/popup.css"), "utf8")}</style></head>`,
+              ),
+          },
           { src: "public/input.html", dest: ".", rename: { stripBase: 1 } },
           { src: "public/offscreen.html", dest: ".", rename: { stripBase: 1 } },
           { src: "public/manifest.meta.json", dest: ".", rename: { stripBase: 1 } },

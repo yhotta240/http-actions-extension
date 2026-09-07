@@ -1,6 +1,5 @@
 import type { Plugin } from "vite";
 import { build } from "vite";
-import cssInjectedByJsPlugin from "vite-plugin-css-injected-by-js";
 import { resolve } from "node:path";
 import { markdownPlugin } from "./markdown.ts";
 import { addProjectWatchFiles } from "../watch-files.ts";
@@ -29,7 +28,7 @@ export function popupScriptPlugin(isDev: boolean, root: string): Plugin {
             configFile: false,
             logLevel: "info",
             publicDir: false,
-            plugins: [markdownPlugin(), cssInjectedByJsPlugin()],
+            plugins: [markdownPlugin()],
             define: {
               "process.env.NODE_ENV": JSON.stringify(isDev ? "development" : "production"),
             },
