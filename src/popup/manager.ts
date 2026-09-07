@@ -13,7 +13,7 @@ import { setupActionEditor } from "./components/action-editor";
 import { setupActionsTab } from "./components/actions-tab";
 import { setupDocumentTab } from "./components/document";
 import { setupInfoTab } from "./components/info";
-import { setupMoreMenu } from "./components/menu";
+import { setupHeaderMenus } from "./components/menu";
 import { PopupPanel } from "./components/panel";
 import { initShareMenu } from "./components/share";
 import { applyTheme, setupThemeMenu } from "./components/theme";
@@ -229,7 +229,7 @@ export class PopupManager {
       setupVariablesTab(variablesContainer);
     }
 
-    setupMoreMenu();
+    setupHeaderMenus();
     setupInfoTab(this.manifestData, this.manifestMetadata);
     setupDocumentTab();
     setupVersionTab(this.manifestData.version);

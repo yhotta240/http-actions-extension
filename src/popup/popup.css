@@ -93,6 +93,7 @@ html {
 }
 
 #theme-button,
+#settings-button,
 #more-button {
   width: 28px;
   height: 28px;
@@ -105,6 +106,7 @@ html {
 }
 
 #theme-button:hover,
+#settings-button:hover,
 #more-button:hover {
   background-color: rgba(0, 0, 0, 0.04);
 }
@@ -114,6 +116,15 @@ html {
   top: 36px;
   right: 0;
   z-index: 2500;
+}
+
+#settings-menu {
+  position: absolute;
+  top: 36px;
+  right: 0;
+  z-index: 2500;
+  min-width: 180px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 #more-menu {
@@ -126,7 +137,8 @@ html {
 }
 
 #more-menu .share-option,
-#more-menu .more-option {
+#more-menu .more-option,
+#settings-menu .settings-option {
   border: none;
   background: transparent;
   color: inherit;
@@ -136,12 +148,14 @@ html {
 }
 
 #more-menu .share-option:hover,
-#more-menu .more-option:hover {
+#more-menu .more-option:hover,
+#settings-menu .settings-option:hover {
   background-color: rgba(0, 0, 0, 0.06);
 }
 
 [data-bs-theme="dark"] #more-menu .share-option:hover,
-[data-bs-theme="dark"] #more-menu .more-option:hover {
+[data-bs-theme="dark"] #more-menu .more-option:hover,
+[data-bs-theme="dark"] #settings-menu .settings-option:hover {
   background-color: rgba(255, 255, 255, 0.1);
 }
 
