@@ -6,7 +6,7 @@ import type {
   Variables,
 } from "../types/actions";
 import { validateActionInputDefinitions } from "./action-inputs";
-import { ACTIONS_STORAGE_KEY, VARIABLES_STORAGE_KEY } from "./storage";
+import { ACTIONS_STORAGE_KEY, getVariables, VARIABLES_STORAGE_KEY } from "./storage";
 
 export const BACKUP_FORMAT = "http-actions-extension-backup";
 export const BACKUP_VERSION = 1;
@@ -24,7 +24,10 @@ export interface BackupFile {
 }
 
 export async function createBackup(): Promise<BackupFile> {
-  const result = await chrome.storage.local.get([ACTIONS_STORAGE_KEY, VARIABLES_STORAGE_KEY]);
+  const [result, variables] = await Promise.all([
+    chrome.storage.local.get(ACTIONS_STORAGE_KEY),
+    getVariables(),
+  ]);
 
   return {
     format: BACKUP_FORMAT,
@@ -32,7 +35,7 @@ export async function createBackup(): Promise<BackupFile> {
     exportedAt: new Date().toISOString(),
     data: {
       actions: (result[ACTIONS_STORAGE_KEY] as HttpAction[] | undefined) ?? [],
-      variables: (result[VARIABLES_STORAGE_KEY] as Variables | undefined) ?? {},
+      variables,
     },
   };
 }
@@ -70,10 +73,17 @@ export async function restoreBackup(backup: BackupFile): Promise<RestoreResult> 
     (key) => key in currentVariables,
   );
 
-  await chrome.storage.local.set({
+  const storageUpdate: Record<string, unknown> = {
     [ACTIONS_STORAGE_KEY]: mergedActions,
-    [VARIABLES_STORAGE_KEY]: { ...currentVariables, ...backup.data.variables },
-  });
+  };
+  if (Object.keys(backup.data.variables).length > 0) {
+    const effectiveVariables = await getVariables();
+    storageUpdate[VARIABLES_STORAGE_KEY] = {
+      ...effectiveVariables,
+      ...backup.data.variables,
+    };
+  }
+  await chrome.storage.local.set(storageUpdate);
 
   return {
     addedActions: addedActions.length,
