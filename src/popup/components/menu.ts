@@ -1,4 +1,5 @@
 import { createBackup, parseBackup, restoreBackup } from "../../utils/backup";
+import { logError } from "../../utils/logger";
 
 /**
  * メニューボタンの挙動を設定する
@@ -60,9 +61,9 @@ export function setupHeaderMenus(): void {
       link.download = `http-actions-backup-${date}.json`;
       link.click();
       URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("JSONエクスポートに失敗しました", error);
-      window.alert("JSONエクスポートに失敗しました");
+    } catch {
+      const message = "JSONエクスポートに失敗しました（データ取得またはファイル作成）";
+      await reportBackupError(message);
     }
   });
 
@@ -78,17 +79,23 @@ export function setupHeaderMenus(): void {
     const file = importInput.files?.[0];
     if (!file) return;
 
+    let stage = "JSONの読み込み";
     try {
       const backup = parseBackup(JSON.parse(await file.text()));
+      stage = "設定データの保存";
       const result = await restoreBackup(backup);
       window.alert(
         `JSONインポートが完了しました\nアクション: ${result.addedActions}件追加，${result.updatedActions}件更新\nVariables: ${result.addedVariables}件追加，${result.updatedVariables}件更新`,
       );
       window.location.reload();
-    } catch (error) {
-      console.error("JSONインポートに失敗しました", error);
-      const message = error instanceof Error ? error.message : "JSONインポートに失敗しました";
-      window.alert(message);
+    } catch {
+      const reason = stage === "JSONの読み込み" ? "JSON読み込みまたは形式確認" : stage;
+      await reportBackupError(`JSONインポートに失敗しました（${reason}）`);
     }
   });
+}
+
+async function reportBackupError(message: string): Promise<void> {
+  await logError(message, "popup");
+  window.alert(message);
 }
