@@ -228,50 +228,65 @@ export class PopupPanel {
     issuesUrl?: string,
   ): void {
     if (this.messageDiv && this.messageScrollDiv) {
-      const p = document.createElement("p");
-      const levelClass = LEVEL_CLASS[level] ?? "text-body";
-      p.className = `m-0 small ${levelClass} d-flex align-items-start gap-1`;
-
-      const sourceLabel = SOURCE_LABEL[source] ?? source;
-      const meta = document.createElement("span");
-      meta.className = "flex-shrink-0 opacity-50";
-      const short = datetime.includes(" ") ? datetime.slice(5) : datetime;
-      meta.textContent = `[${short}][${sourceLabel}]`;
-
-      const body = document.createElement("span");
-      body.className = "text-break flex-grow-1";
-      body.textContent = message;
-
-      if (level === "error" && issuesUrl) {
-        const sep = document.createElement("span");
-        sep.textContent = " — ";
-        const link = document.createElement("a");
-        link.href = issuesUrl;
-        link.target = "_blank";
-        link.rel = "noopener noreferrer";
-        link.textContent = "問題を報告する";
-        link.className = "text-danger";
-        body.appendChild(sep);
-        body.appendChild(link);
-      }
-
-      p.appendChild(meta);
-      p.appendChild(body);
-
-      this.messageDiv.appendChild(p);
+      this.messageDiv.appendChild(
+        this.createLogElement(message, datetime, level, source, issuesUrl),
+      );
       this.messageScrollDiv.scrollTop = this.messageScrollDiv.scrollHeight;
     }
   }
 
+  private createLogElement(
+    message: string,
+    datetime: string,
+    level: LogLevel,
+    source: string,
+    issuesUrl?: string,
+  ): HTMLParagraphElement {
+    const p = document.createElement("p");
+    const levelClass = LEVEL_CLASS[level] ?? "text-body";
+    p.className = `m-0 small ${levelClass} d-flex align-items-start gap-1`;
+
+    const sourceLabel = SOURCE_LABEL[source] ?? source;
+    const meta = document.createElement("span");
+    meta.className = "flex-shrink-0 opacity-50";
+    const short = datetime.includes(" ") ? datetime.slice(5) : datetime;
+    meta.textContent = `[${short}][${sourceLabel}]`;
+
+    const body = document.createElement("span");
+    body.className = "text-break flex-grow-1";
+    body.textContent = message;
+
+    if (level === "error" && issuesUrl) {
+      const sep = document.createElement("span");
+      sep.textContent = " — ";
+      const link = document.createElement("a");
+      link.href = issuesUrl;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = "問題を報告する";
+      link.className = "text-danger";
+      body.appendChild(sep);
+      body.appendChild(link);
+    }
+
+    p.appendChild(meta);
+    p.appendChild(body);
+    return p;
+  }
+
   public loadLogs(entries: LogEntry[], issuesUrl?: string): void {
+    if (!this.messageDiv || !this.messageScrollDiv) return;
+
     this.clearMessage();
+    const fragment = document.createDocumentFragment();
     for (const entry of entries) {
       if (entry.hidden) continue;
-      this.messageOutput(entry.message, entry.timestamp, entry.level, entry.source, issuesUrl);
+      fragment.appendChild(
+        this.createLogElement(entry.message, entry.timestamp, entry.level, entry.source, issuesUrl),
+      );
     }
-    if (this.messageScrollDiv) {
-      this.messageScrollDiv.scrollTop = this.messageScrollDiv.scrollHeight;
-    }
+    this.messageDiv.appendChild(fragment);
+    this.messageScrollDiv.scrollTop = this.messageScrollDiv.scrollHeight;
   }
 
   public clearMessage(): void {
