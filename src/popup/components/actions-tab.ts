@@ -179,9 +179,37 @@ export function setupActionsTab(
   const responseDisplayParams = new URLSearchParams(window.location.search);
   const responseActionId = responseDisplayParams.get("responseActionId");
   const expandResponse = responseDisplayParams.get("expandResponse") === "1";
+  const statusElements = new Map<string, HTMLElement>();
+  let latestResult: StoredExecutionResult | undefined;
+
+  const clearExecutionResult = (element: HTMLElement): void => {
+    element.className = "small d-none mt-1 border-top pt-1";
+    element.replaceChildren();
+  };
+
+  const updateLatestResult = (nextResult: StoredExecutionResult | undefined): void => {
+    if (latestResult?.actionId !== nextResult?.actionId) {
+      const previousStatus = latestResult ? statusElements.get(latestResult.actionId) : undefined;
+      if (previousStatus) clearExecutionResult(previousStatus);
+    }
+
+    latestResult = nextResult;
+    if (!nextResult) return;
+
+    const statusMsg = statusElements.get(nextResult.actionId);
+    if (statusMsg) {
+      renderExecutionResult(
+        statusMsg,
+        nextResult,
+        expandResponse && responseActionId === nextResult.actionId,
+      );
+    }
+  };
 
   const render = async () => {
-    const [actions, latestResult] = await Promise.all([getActions(), getLatestExecutionResult()]);
+    const [actions, loadedResult] = await Promise.all([getActions(), getLatestExecutionResult()]);
+    latestResult = loadedResult;
+    statusElements.clear();
     container.innerHTML = "";
 
     if (actions.length === 0) {
@@ -302,6 +330,7 @@ export function setupActionsTab(
           expandResponse && responseActionId === action.id,
         );
       }
+      statusElements.set(action.id, statusMsg);
 
       runBtn.addEventListener("click", async () => {
         runBtn.disabled = true;
@@ -346,7 +375,9 @@ export function setupActionsTab(
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === "session" && changes[LATEST_EXECUTION_RESULT_KEY]) {
-      void render();
+      updateLatestResult(
+        changes[LATEST_EXECUTION_RESULT_KEY].newValue as StoredExecutionResult | undefined,
+      );
     }
   });
 
