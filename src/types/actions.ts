@@ -43,6 +43,7 @@ export interface ExecutionResult {
   statusCode?: number;
   statusText?: string;
   responseBody?: string;
+  responseHeaders?: Record<string, string>;
   error?: string;
   timestamp: string;
 }

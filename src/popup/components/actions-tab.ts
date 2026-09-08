@@ -3,6 +3,11 @@ import type {
   ExecutionPageContext,
   ExecutionResult,
 } from "../../types/actions";
+import {
+  getLatestExecutionResult,
+  LATEST_EXECUTION_RESULT_KEY,
+  type StoredExecutionResult,
+} from "../../utils/response-storage";
 import { getActions, setActions } from "../../utils/storage";
 
 function executeActionInBackground(
@@ -43,6 +48,90 @@ function getMethodBadgeClass(method: string): string {
     default:
       return "bg-secondary";
   }
+}
+
+function formatResponseBody(body: string | undefined): string {
+  if (!body) return "（本文なし）";
+  try {
+    return JSON.stringify(JSON.parse(body), null, 2) ?? body;
+  } catch {
+    return body;
+  }
+}
+
+function formatResponseHeaders(headers: Record<string, string> | undefined): string {
+  if (!headers || Object.keys(headers).length === 0) return "（ヘッダーなし）";
+  return Object.entries(headers)
+    .map(([key, value]) => `${key}: ${value}`)
+    .join("\n");
+}
+
+function renderExecutionResult(
+  container: HTMLElement,
+  result: ExecutionResult | StoredExecutionResult,
+): void {
+  container.className = "small mt-1 border-top pt-1";
+  container.replaceChildren();
+
+  if (result.statusCode === undefined) {
+    container.classList.add("text-danger-emphasis");
+    container.textContent = `✕ ${result.error || "エラー"}`;
+    return;
+  }
+
+  container.classList.add(result.success ? "text-success-emphasis" : "text-danger-emphasis");
+
+  const summaryLine = document.createElement("div");
+  summaryLine.className = "d-flex align-items-center gap-2";
+  const summary = document.createElement("span");
+  summary.textContent =
+    `${result.success ? "✓" : "✕"} ${result.statusCode} ${result.statusText || ""}`.trim();
+  summaryLine.appendChild(summary);
+
+  const details = document.createElement("div");
+  details.className = "d-none mt-1 text-body";
+
+  const detailButton = document.createElement("button");
+  detailButton.type = "button";
+  detailButton.className = "btn btn-sm btn-link p-0";
+  detailButton.textContent = "詳細";
+  detailButton.addEventListener("click", () => {
+    const expanded = !details.classList.contains("d-none");
+    details.classList.toggle("d-none", expanded);
+    detailButton.textContent = expanded ? "詳細" : "閉じる";
+  });
+  summaryLine.appendChild(detailButton);
+
+  const responseLabel = document.createElement("div");
+  responseLabel.className = "fw-semibold mt-1";
+  responseLabel.textContent = "Response";
+  details.appendChild(responseLabel);
+
+  if ("responseBodyTruncated" in result && result.responseBodyTruncated) {
+    const limitMessage = document.createElement("div");
+    limitMessage.className = "text-warning small";
+    limitMessage.textContent = "100KB制限：レスポンスが大きいため一部のみ表示しています";
+    details.appendChild(limitMessage);
+  }
+
+  const responseBody = document.createElement("pre");
+  responseBody.className = "small border rounded p-2 mb-1 mt-1 overflow-auto";
+  responseBody.style.maxHeight = "240px";
+  responseBody.textContent = formatResponseBody(result.responseBody);
+  details.appendChild(responseBody);
+
+  const headersDetails = document.createElement("details");
+  const headersSummary = document.createElement("summary");
+  headersSummary.textContent = "Headers";
+  headersDetails.appendChild(headersSummary);
+  const responseHeaders = document.createElement("pre");
+  responseHeaders.className = "small border rounded p-2 mt-1 overflow-auto";
+  responseHeaders.textContent = formatResponseHeaders(result.responseHeaders);
+  headersDetails.appendChild(responseHeaders);
+  details.appendChild(headersDetails);
+
+  container.appendChild(summaryLine);
+  container.appendChild(details);
 }
 
 async function getActiveTabContext(): Promise<ExecutionPageContext> {
@@ -87,7 +176,7 @@ export function setupActionsTab(
   onEditAction?: (actionId: string) => void,
 ): { refresh: () => Promise<void> } {
   const render = async () => {
-    const actions = await getActions();
+    const [actions, latestResult] = await Promise.all([getActions(), getLatestExecutionResult()]);
     container.innerHTML = "";
 
     if (actions.length === 0) {
@@ -201,6 +290,9 @@ export function setupActionsTab(
       const statusMsg = document.createElement("div");
       statusMsg.className = "small d-none mt-1 border-top pt-1";
       statusMsg.style.fontSize = "0.75rem";
+      if (latestResult?.actionId === action.id) {
+        renderExecutionResult(statusMsg, latestResult);
+      }
 
       runBtn.addEventListener("click", async () => {
         runBtn.disabled = true;
@@ -216,12 +308,12 @@ export function setupActionsTab(
           if ("inputRequired" in result) {
             statusMsg.className = "small text-info mt-1 border-top pt-1";
             statusMsg.textContent = "実行入力画面を開きました";
-          } else if (result.success) {
-            statusMsg.className = "small text-success mt-1 border-top pt-1";
-            statusMsg.textContent = `✓ ${result.statusCode ?? 200} ${result.statusText ?? "OK"}`;
           } else {
-            statusMsg.className = "small text-danger mt-1 border-top pt-1";
-            statusMsg.textContent = `✕ ${result.statusCode ? `${result.statusCode} ` : ""}${result.error || result.statusText || "エラー"}`;
+            const storedResult = await getLatestExecutionResult();
+            renderExecutionResult(
+              statusMsg,
+              storedResult?.actionId === action.id ? storedResult : result,
+            );
           }
         } catch (err: unknown) {
           statusMsg.className = "small text-danger mt-1 border-top pt-1";
@@ -242,6 +334,12 @@ export function setupActionsTab(
   };
 
   render();
+
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "session" && changes[LATEST_EXECUTION_RESULT_KEY]) {
+      void render();
+    }
+  });
 
   return {
     refresh: render,

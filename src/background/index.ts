@@ -13,6 +13,7 @@ import {
   showExecutionNotification,
 } from "../utils/executor";
 import { logError, logInfo } from "../utils/logger";
+import { saveLatestExecutionResult } from "../utils/response-storage";
 import {
   ACTIONS_STORAGE_KEY,
   getActions,
@@ -218,6 +219,9 @@ async function executeActionById(
     inputValues,
     executePreparedRequestInOffscreen,
   );
+  await saveLatestExecutionResult(result).catch(() => {
+    logError("最新レスポンスの一時保存に失敗しました", "background");
+  });
   showExecutionNotification(result);
   return result;
 }

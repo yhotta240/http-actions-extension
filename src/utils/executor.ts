@@ -107,6 +107,7 @@ export async function executePreparedHttpRequest(
       statusCode: response.status,
       statusText: response.statusText,
       responseBody: resBodyText,
+      responseHeaders: Object.fromEntries(response.headers.entries()),
       timestamp,
     };
 
@@ -141,7 +142,6 @@ function logExecutionResult(action: HttpAction, result: ExecutionResult): void {
     logError(
       `✕ [${result.statusCode} ${result.statusText}] "${action.name}" の実行に失敗しました (${action.method} ${action.url})`,
       "background",
-      { status: result.statusCode, body: result.responseBody?.slice(0, 300) },
     );
   } else {
     logError(
