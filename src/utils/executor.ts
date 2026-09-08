@@ -19,6 +19,7 @@ export interface PreparedHttpRequest {
 }
 
 export type PreparedRequestExecutor = (request: PreparedHttpRequest) => Promise<ExecutionResult>;
+export const EXECUTION_NOTIFICATION_ID = "http-actions-execution-result";
 
 function normalizeTimeoutMs(value: unknown): number | undefined {
   return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : undefined;
@@ -107,6 +108,7 @@ export async function executePreparedHttpRequest(
       statusCode: response.status,
       statusText: response.statusText,
       responseBody: resBodyText,
+      responseHeaders: Object.fromEntries(response.headers.entries()),
       timestamp,
     };
 
@@ -141,7 +143,6 @@ function logExecutionResult(action: HttpAction, result: ExecutionResult): void {
     logError(
       `✕ [${result.statusCode} ${result.statusText}] "${action.name}" の実行に失敗しました (${action.method} ${action.url})`,
       "background",
-      { status: result.statusCode, body: result.responseBody?.slice(0, 300) },
     );
   } else {
     logError(
@@ -181,22 +182,24 @@ export function showExecutionNotification(result: ExecutionResult): void {
   const iconUrl = chrome.runtime.getURL("icons/icon.png");
 
   if (result.success) {
-    chrome.notifications.create({
+    void chrome.notifications.create(EXECUTION_NOTIFICATION_ID, {
       type: "basic",
       iconUrl,
       title: `✓ ${result.statusCode ?? 200} ${result.statusText ?? "OK"}`,
       message: `${result.actionName} へ送信しました`,
+      contextMessage: "クリックしてレスポンスを表示",
       priority: 1,
     });
   } else {
     const statusPart = result.statusCode
       ? `${result.statusCode} ${result.statusText || ""}`
       : "Request Failed";
-    chrome.notifications.create({
+    void chrome.notifications.create(EXECUTION_NOTIFICATION_ID, {
       type: "basic",
       iconUrl,
       title: `✕ ${statusPart}`,
       message: `${result.actionName}: ${result.error || result.responseBody?.slice(0, 80) || "エラーが発生しました"}`,
+      contextMessage: "クリックして結果を表示",
       priority: 2,
     });
   }
