@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "HTTP Actions - Webページの情報を使ってAPIを呼び出す",
   "short_name": "HTTP Actions",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Chromeのコンテキストメニューやポップアップから任意のHTTP Requestを送信できる拡張機能",
   "icons": {
     "48": "icons/icon.png"
