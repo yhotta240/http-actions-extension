@@ -69,6 +69,7 @@ function formatResponseHeaders(headers: Record<string, string> | undefined): str
 function renderExecutionResult(
   container: HTMLElement,
   result: ExecutionResult | StoredExecutionResult,
+  expandDetails = false,
 ): void {
   container.className = "small mt-1 border-top pt-1";
   container.replaceChildren();
@@ -89,12 +90,12 @@ function renderExecutionResult(
   summaryLine.appendChild(summary);
 
   const details = document.createElement("div");
-  details.className = "d-none mt-1 text-body";
+  details.className = `${expandDetails ? "" : "d-none "}mt-1 text-body`;
 
   const detailButton = document.createElement("button");
   detailButton.type = "button";
   detailButton.className = "btn btn-sm btn-link p-0";
-  detailButton.textContent = "詳細";
+  detailButton.textContent = expandDetails ? "閉じる" : "詳細";
   detailButton.addEventListener("click", () => {
     const expanded = !details.classList.contains("d-none");
     details.classList.toggle("d-none", expanded);
@@ -175,6 +176,10 @@ export function setupActionsTab(
   container: HTMLElement,
   onEditAction?: (actionId: string) => void,
 ): { refresh: () => Promise<void> } {
+  const responseDisplayParams = new URLSearchParams(window.location.search);
+  const responseActionId = responseDisplayParams.get("responseActionId");
+  const expandResponse = responseDisplayParams.get("expandResponse") === "1";
+
   const render = async () => {
     const [actions, latestResult] = await Promise.all([getActions(), getLatestExecutionResult()]);
     container.innerHTML = "";
@@ -291,7 +296,11 @@ export function setupActionsTab(
       statusMsg.className = "small d-none mt-1 border-top pt-1";
       statusMsg.style.fontSize = "0.75rem";
       if (latestResult?.actionId === action.id) {
-        renderExecutionResult(statusMsg, latestResult);
+        renderExecutionResult(
+          statusMsg,
+          latestResult,
+          expandResponse && responseActionId === action.id,
+        );
       }
 
       runBtn.addEventListener("click", async () => {

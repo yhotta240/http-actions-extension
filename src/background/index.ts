@@ -7,13 +7,14 @@ import type {
 } from "../types/actions";
 import { getMissingRequiredActionInputs } from "../utils/action-inputs";
 import {
+  EXECUTION_NOTIFICATION_ID,
   executeHttpAction,
   type PreparedHttpRequest,
   type PreparedRequestExecutor,
   showExecutionNotification,
 } from "../utils/executor";
 import { logError, logInfo } from "../utils/logger";
-import { saveLatestExecutionResult } from "../utils/response-storage";
+import { getLatestExecutionResult, saveLatestExecutionResult } from "../utils/response-storage";
 import {
   ACTIONS_STORAGE_KEY,
   getActions,
@@ -27,6 +28,8 @@ const ROOT_MENU_ID = "http_actions_root";
 const OFFSCREEN_DOCUMENT_PATH = "offscreen.html";
 const INPUT_PAGE_PATH = "input.html";
 const PENDING_INPUT_KEY_PREFIX = "pending-input:";
+const RESPONSE_ACTION_ID_PARAM = "responseActionId";
+const EXPAND_RESPONSE_PARAM = "expandResponse";
 
 interface PendingInputRequest {
   actionId: string;
@@ -75,6 +78,23 @@ function failedExecutionResult(actionId: string, error: string): ExecutionResult
 
 function pendingInputStorageKey(requestId: string): string {
   return `${PENDING_INPUT_KEY_PREFIX}${requestId}`;
+}
+
+async function openLatestResponsePopup(): Promise<void> {
+  const latestResult = await getLatestExecutionResult();
+  if (!latestResult) return;
+
+  const popupUrl = new URL(chrome.runtime.getURL("popup.html"));
+  popupUrl.searchParams.set(RESPONSE_ACTION_ID_PARAM, latestResult.actionId);
+  popupUrl.searchParams.set(EXPAND_RESPONSE_PARAM, "1");
+
+  await chrome.windows.create({
+    url: popupUrl.toString(),
+    type: "popup",
+    width: 480,
+    height: 720,
+    focused: true,
+  });
 }
 
 async function findActionById(actionId: string) {
@@ -385,6 +405,13 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
   // Execute
   await startActionById(actionId, pageContext);
+});
+
+chrome.notifications.onClicked.addListener((notificationId) => {
+  if (notificationId !== EXECUTION_NOTIFICATION_ID) return;
+  void openLatestResponsePopup().catch((error: unknown) => {
+    logError("レスポンス表示Popupの起動に失敗しました", "background", error);
+  });
 });
 
 // Listen for messages from popup (e.g. manual execution or menu refresh)
