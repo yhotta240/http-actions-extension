@@ -21,7 +21,7 @@ HTTPリクエストをアクションとして登録し，ポップアップや�
 
 必要条件
 
-- [Node.js](https://nodejs.org/) (v18.x 以上を推奨)
+- [Node.js](https://nodejs.org/) (22.12.0以上（23.xを除く）)
 - [npm](https://www.npmjs.com/) または [yarn](https://yarnpkg.com/)
 
 手順
