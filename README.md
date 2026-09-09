@@ -1,23 +1,55 @@
 # HTTP Actions
 
-Chromeのコンテキストメニューやポップアップから，Webページの情報を使った任意のHTTPリクエストを送信できる拡張機能です．
+HTTPリクエストをアクションとして登録し，ポップアップや右クリックメニューから実行できるChrome拡張機能です．
 
 ## 主な機能
 
-- GET，POST，PUT，PATCH，DELETEへの対応
-- ページ，選択文字列，リンク，画像に対応したコンテキストメニュー
-- JSON（KV）またはRaw形式の本文編集
-- テンプレート変数，ユーザー定義変数，シークレット
+- HTTPリクエストのアクション登録・編集
+- ポップアップと右クリックメニューからの実行
+- ページ情報，実行時入力，変数，シークレットのテンプレート展開
+- ヘッダーとJSON（KV）・Raw形式の本文編集
+- HTTPレスポンスの表示
 - 実行結果の通知とログ表示
 
-## クイックスタート
+## インストール
 
-```bash
-npm install
-npm run build
-```
+### Chrome Web Store からインストール
 
-ビルド後，Chromeで`chrome://extensions/`を開き，「デベロッパーモード」→「パッケージ化されていない拡張機能を読み込む」から`dist/`を選択してください．
+[HTTP Actions - Chrome ウェブストア](https://chrome.google.com/webstore/detail/http-actions/pokpmgkcbccalbhademgdijckcheekjm)
+
+### 手動インストール
+
+必要条件
+
+- [Node.js](https://nodejs.org/) (22.12.0以上（23.xを除く）)
+- [npm](https://www.npmjs.com/) または [yarn](https://yarnpkg.com/)
+
+手順
+
+1. このリポジトリをクローン
+
+   ```bash
+   git clone https://github.com/yhotta240/http-actions-extension.git
+   cd http-actions-extension
+   ```
+
+2. 依存関係をインストール
+
+   ```bash
+   npm install
+   ```
+
+3. ビルド
+
+   ```bash
+   npm run build
+   ```
+
+4. Chrome に読み込む
+   - Chrome で `chrome://extensions/` を開く
+   - 「デベロッパーモード」をオンにする
+   - 「パッケージ化されていない拡張機能を読み込む」をクリック
+   - `dist/` ディレクトリを選択
 
 ## 使い方
 
@@ -26,23 +58,6 @@ npm run build
 - [プライバシーポリシー](docs/policies/privacy-policy.md)
 
 初回起動時には，動作確認用のサンプルアクションが登録されます．利用前に送信先と本文を確認してください．
-
-## 開発
-
-```bash
-# 開発用ビルドと自動リロード
-npm run watch
-
-# 開発用マニフェストを使ったビルド
-npm run build:dev
-
-# チェックと本番用ビルド
-npm run check
-npm run typecheck
-npm run build
-```
-
-実装の構成やドキュメントの追加方法は，リポジトリ内の各ファイルと[ドキュメント](docs/overview.md)を参照してください．
 
 ## ライセンス
 
