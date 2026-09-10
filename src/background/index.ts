@@ -109,7 +109,7 @@ async function openLatestResponsePopup(): Promise<void> {
     url: popupUrl.toString(),
     type: "popup",
     width: 480,
-    height: 720,
+    height: 480,
     focused: true,
   });
   if (responseWindow?.id === undefined) {
