@@ -180,27 +180,35 @@ export async function executeHttpAction(
 
 export function showExecutionNotification(result: ExecutionResult): void {
   const iconUrl = chrome.runtime.getURL("icons/icon.png");
+  let notification: chrome.notifications.NotificationCreateOptions;
 
   if (result.success) {
-    void chrome.notifications.create(EXECUTION_NOTIFICATION_ID, {
+    notification = {
       type: "basic",
       iconUrl,
       title: `✓ ${result.statusCode ?? 200} ${result.statusText ?? "OK"}`,
       message: `${result.actionName} へ送信しました`,
       contextMessage: "クリックしてレスポンスを表示",
       priority: 1,
-    });
+    };
   } else {
     const statusPart = result.statusCode
       ? `${result.statusCode} ${result.statusText || ""}`
       : "Request Failed";
-    void chrome.notifications.create(EXECUTION_NOTIFICATION_ID, {
+    notification = {
       type: "basic",
       iconUrl,
       title: `✕ ${statusPart}`,
-      message: `${result.actionName}: ${result.error || result.responseBody?.slice(0, 80) || "エラーが発生しました"}`,
-      contextMessage: "クリックして結果を表示",
+      message:
+        result.statusCode !== undefined
+          ? `${result.actionName}のエラー詳細を確認してください`
+          : `${result.actionName}: ${result.error || "エラーが発生しました"}`,
+      contextMessage: "クリックして詳細を表示",
       priority: 2,
-    });
+    };
   }
+
+  void chrome.notifications.clear(EXECUTION_NOTIFICATION_ID, () => {
+    void chrome.notifications.create(EXECUTION_NOTIFICATION_ID, notification);
+  });
 }
