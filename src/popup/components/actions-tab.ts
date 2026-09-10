@@ -189,6 +189,10 @@ export function setupActionsTab(
   };
 
   const updateLatestResult = (nextResult: StoredExecutionResult | undefined): void => {
+    if (responseOnly && responseActionId && nextResult?.actionId !== responseActionId) {
+      return;
+    }
+
     if (latestResult?.actionId !== nextResult?.actionId) {
       const previousStatus = latestResult ? statusElements.get(latestResult.actionId) : undefined;
       if (previousStatus) clearExecutionResult(previousStatus);
@@ -315,7 +319,7 @@ export function setupActionsTab(
 
       toggle.addEventListener("change", async () => {
         action.enabled = toggle.checked;
-        await setActions(actions);
+        await setActions(allActions);
       });
 
       formCheck.appendChild(toggle);
