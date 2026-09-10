@@ -103,6 +103,16 @@ function renderExecutionResult(
   });
   summaryLine.appendChild(detailButton);
 
+  const headersDetails = document.createElement("details");
+  const headersSummary = document.createElement("summary");
+  headersSummary.textContent = "Headers";
+  headersDetails.appendChild(headersSummary);
+  const responseHeaders = document.createElement("pre");
+  responseHeaders.className = "small border rounded p-2 mt-1 overflow-auto";
+  responseHeaders.textContent = formatResponseHeaders(result.responseHeaders);
+  headersDetails.appendChild(responseHeaders);
+  details.appendChild(headersDetails);
+
   const responseLabel = document.createElement("div");
   responseLabel.className = "fw-semibold mt-1";
   responseLabel.textContent = "Response";
@@ -120,16 +130,6 @@ function renderExecutionResult(
   responseBody.style.maxHeight = "240px";
   responseBody.textContent = formatResponseBody(result.responseBody);
   details.appendChild(responseBody);
-
-  const headersDetails = document.createElement("details");
-  const headersSummary = document.createElement("summary");
-  headersSummary.textContent = "Headers";
-  headersDetails.appendChild(headersSummary);
-  const responseHeaders = document.createElement("pre");
-  responseHeaders.className = "small border rounded p-2 mt-1 overflow-auto";
-  responseHeaders.textContent = formatResponseHeaders(result.responseHeaders);
-  headersDetails.appendChild(responseHeaders);
-  details.appendChild(headersDetails);
 
   container.appendChild(summaryLine);
   container.appendChild(details);
@@ -179,6 +179,7 @@ export function setupActionsTab(
   const responseDisplayParams = new URLSearchParams(window.location.search);
   const responseActionId = responseDisplayParams.get("responseActionId");
   const expandResponse = responseDisplayParams.get("expandResponse") === "1";
+  const responseOnly = responseDisplayParams.get("responseOnly") === "1";
   const statusElements = new Map<string, HTMLElement>();
   let latestResult: StoredExecutionResult | undefined;
 
@@ -188,6 +189,10 @@ export function setupActionsTab(
   };
 
   const updateLatestResult = (nextResult: StoredExecutionResult | undefined): void => {
+    if (responseOnly && responseActionId && nextResult?.actionId !== responseActionId) {
+      return;
+    }
+
     if (latestResult?.actionId !== nextResult?.actionId) {
       const previousStatus = latestResult ? statusElements.get(latestResult.actionId) : undefined;
       if (previousStatus) clearExecutionResult(previousStatus);
@@ -207,7 +212,14 @@ export function setupActionsTab(
   };
 
   const render = async () => {
-    const [actions, loadedResult] = await Promise.all([getActions(), getLatestExecutionResult()]);
+    const [allActions, loadedResult] = await Promise.all([
+      getActions(),
+      getLatestExecutionResult(),
+    ]);
+    const actions =
+      responseOnly && responseActionId
+        ? allActions.filter((action) => action.id === responseActionId)
+        : allActions;
     latestResult = loadedResult;
     statusElements.clear();
     container.innerHTML = "";
@@ -307,7 +319,7 @@ export function setupActionsTab(
 
       toggle.addEventListener("change", async () => {
         action.enabled = toggle.checked;
-        await setActions(actions);
+        await setActions(allActions);
       });
 
       formCheck.appendChild(toggle);
