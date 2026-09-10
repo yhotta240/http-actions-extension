@@ -179,6 +179,7 @@ export function setupActionsTab(
   const responseDisplayParams = new URLSearchParams(window.location.search);
   const responseActionId = responseDisplayParams.get("responseActionId");
   const expandResponse = responseDisplayParams.get("expandResponse") === "1";
+  const responseOnly = responseDisplayParams.get("responseOnly") === "1";
   const statusElements = new Map<string, HTMLElement>();
   let latestResult: StoredExecutionResult | undefined;
 
@@ -207,7 +208,14 @@ export function setupActionsTab(
   };
 
   const render = async () => {
-    const [actions, loadedResult] = await Promise.all([getActions(), getLatestExecutionResult()]);
+    const [allActions, loadedResult] = await Promise.all([
+      getActions(),
+      getLatestExecutionResult(),
+    ]);
+    const actions =
+      responseOnly && responseActionId
+        ? allActions.filter((action) => action.id === responseActionId)
+        : allActions;
     latestResult = loadedResult;
     statusElements.clear();
     container.innerHTML = "";

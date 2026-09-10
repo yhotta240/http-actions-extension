@@ -30,6 +30,7 @@ const INPUT_PAGE_PATH = "input.html";
 const PENDING_INPUT_KEY_PREFIX = "pending-input:";
 const RESPONSE_ACTION_ID_PARAM = "responseActionId";
 const EXPAND_RESPONSE_PARAM = "expandResponse";
+const RESPONSE_ONLY_PARAM = "responseOnly";
 
 interface PendingInputRequest {
   actionId: string;
@@ -88,6 +89,7 @@ async function openLatestResponsePopup(): Promise<void> {
   const popupUrl = new URL(chrome.runtime.getURL("popup.html"));
   popupUrl.searchParams.set(RESPONSE_ACTION_ID_PARAM, latestResult.actionId);
   popupUrl.searchParams.set(EXPAND_RESPONSE_PARAM, "1");
+  popupUrl.searchParams.set(RESPONSE_ONLY_PARAM, "1");
 
   if (responseWindowId !== undefined) {
     try {

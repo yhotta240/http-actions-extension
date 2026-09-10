@@ -171,6 +171,7 @@ export class PopupManager {
   }
 
   private setupUI(): void {
+    const responseOnly = new URLSearchParams(window.location.search).get("responseOnly") === "1";
     const short_name = this.manifestData.short_name || this.manifestData.name;
     const title = document.getElementById("title");
     if (title) {
@@ -189,6 +190,16 @@ export class PopupManager {
     const actionsListContainer = document.getElementById("actions-list-container");
     const actionEditorContainer = document.getElementById("action-editor-container");
     const variablesContainer = document.getElementById("variables-container");
+
+    if (responseOnly) {
+      document.getElementById("header")?.classList.add("d-none");
+      document.getElementById("myTab")?.classList.add("d-none");
+      document.getElementById("enabled")?.parentElement?.parentElement?.classList.add("d-none");
+      document.querySelector("#actions-panel > .d-flex")?.classList.add("d-none");
+
+      const actionsPanel = document.getElementById("actions-panel");
+      actionsPanel?.classList.remove("mt-2", "mx-2");
+    }
 
     let actionsRef: { refresh: () => Promise<void> } | null = null;
     let editorRef: {
