@@ -106,6 +106,7 @@ function renderInputs(data: InputPageData): void {
           `${result.statusCode ?? 200} ${result.statusText ?? "OK"} で実行しました`,
           "success",
         );
+        window.setTimeout(() => window.close(), 1000);
       } else {
         setMessage(
           `${result.statusCode ? `${result.statusCode} ` : ""}${result.error || result.statusText || "実行に失敗しました"}`,
