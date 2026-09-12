@@ -52,6 +52,10 @@ export function interpolateTemplate(
       value = page.linkUrl ?? "";
     } else if (key === "image.url") {
       value = page.imageUrl ?? "";
+    } else if (key === "video.url") {
+      value = page.videoUrl ?? "";
+    } else if (key === "audio.url") {
+      value = page.audioUrl ?? "";
     } else if (key.startsWith("var.")) {
       const varKey = key.slice(4);
       value = variables[varKey] ?? "";
