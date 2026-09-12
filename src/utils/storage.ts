@@ -1,5 +1,6 @@
 import { DEFAULT_SETTINGS, type Settings } from "../settings";
 import type { HttpAction, Secrets, Variables } from "../types/actions";
+import { normalizeAction, type StoredHttpAction } from "./action-migration";
 
 export const ACTIONS_STORAGE_KEY = "actions";
 export const VARIABLES_STORAGE_KEY = "variables";
@@ -23,7 +24,7 @@ export const DEFAULT_ACTIONS: HttpAction[] = [
       null,
       2,
     ),
-    contexts: ["page"],
+    triggers: [{ type: "contextMenu", contexts: ["page"] }],
     enabled: true,
     order: 0,
   },
@@ -43,7 +44,7 @@ export const DEFAULT_ACTIONS: HttpAction[] = [
       null,
       2,
     ),
-    contexts: ["selection"],
+    triggers: [{ type: "contextMenu", contexts: ["selection"] }],
     enabled: true,
     order: 1,
   },
@@ -69,13 +70,15 @@ export async function setEnabled(enabled: boolean): Promise<void> {
 }
 
 export async function getActions(): Promise<HttpAction[]> {
-  const data = await getStorage<{ [ACTIONS_STORAGE_KEY]?: HttpAction[] }>(ACTIONS_STORAGE_KEY);
+  const data = await getStorage<{ [ACTIONS_STORAGE_KEY]?: StoredHttpAction[] }>(
+    ACTIONS_STORAGE_KEY,
+  );
   if (!data[ACTIONS_STORAGE_KEY]) {
     // If not initialized, save default actions
     await setActions(DEFAULT_ACTIONS);
     return DEFAULT_ACTIONS;
   }
-  return data[ACTIONS_STORAGE_KEY];
+  return data[ACTIONS_STORAGE_KEY].map(normalizeAction);
 }
 
 export async function setActions(actions: HttpAction[]): Promise<void> {

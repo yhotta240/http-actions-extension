@@ -6,7 +6,9 @@ import type {
   Variables,
 } from "../types/actions";
 import { validateActionInputDefinitions } from "./action-inputs";
+import { normalizeAction, type StoredHttpAction } from "./action-migration";
 import { ACTIONS_STORAGE_KEY, getVariables, VARIABLES_STORAGE_KEY } from "./storage";
+import { validateTriggers } from "./triggers";
 
 export const BACKUP_FORMAT = "http-actions-extension-backup";
 export const BACKUP_VERSION = 1;
@@ -34,7 +36,9 @@ export async function createBackup(): Promise<BackupFile> {
     version: BACKUP_VERSION,
     exportedAt: new Date().toISOString(),
     data: {
-      actions: (result[ACTIONS_STORAGE_KEY] as HttpAction[] | undefined) ?? [],
+      actions: ((result[ACTIONS_STORAGE_KEY] as StoredHttpAction[] | undefined) ?? []).map(
+        normalizeAction,
+      ),
       variables,
     },
   };
@@ -49,7 +53,9 @@ export interface RestoreResult {
 
 export async function restoreBackup(backup: BackupFile): Promise<RestoreResult> {
   const result = await chrome.storage.local.get([ACTIONS_STORAGE_KEY, VARIABLES_STORAGE_KEY]);
-  const currentActions = (result[ACTIONS_STORAGE_KEY] as HttpAction[] | undefined) ?? [];
+  const currentActions = (
+    (result[ACTIONS_STORAGE_KEY] as StoredHttpAction[] | undefined) ?? []
+  ).map(normalizeAction);
   const currentVariables = (result[VARIABLES_STORAGE_KEY] as Variables | undefined) ?? {};
   const importedActions = new Map(backup.data.actions.map((action) => [action.id, action]));
   const updatedActions = currentActions.filter((action) => importedActions.has(action.id)).length;
@@ -120,7 +126,7 @@ export function parseBackup(value: unknown): BackupFile {
     version: BACKUP_VERSION,
     exportedAt: typeof value.exportedAt === "string" ? value.exportedAt : new Date().toISOString(),
     data: {
-      actions: data.actions,
+      actions: data.actions.map(normalizeAction),
       variables: data.variables,
     },
   };
@@ -134,7 +140,7 @@ function isStringRecord(value: unknown): value is Record<string, string> {
   return isRecord(value) && Object.values(value).every((item) => typeof item === "string");
 }
 
-function isHttpAction(value: unknown): value is HttpAction {
+function isHttpAction(value: unknown): value is StoredHttpAction {
   if (!isRecord(value)) return false;
   if (
     typeof value.id !== "string" ||
@@ -143,11 +149,14 @@ function isHttpAction(value: unknown): value is HttpAction {
     typeof value.url !== "string" ||
     !isStringRecord(value.headers) ||
     typeof value.body !== "string" ||
-    !Array.isArray(value.contexts) ||
-    !value.contexts.every(isActionContext) ||
     typeof value.enabled !== "boolean" ||
     typeof value.order !== "number"
   ) {
+    return false;
+  }
+  if (value.triggers !== undefined) {
+    if (!validateTriggers(value.triggers).valid) return false;
+  } else if (!Array.isArray(value.contexts) || !value.contexts.every(isActionContext)) {
     return false;
   }
   if (

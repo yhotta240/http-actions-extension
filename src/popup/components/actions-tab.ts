@@ -9,6 +9,7 @@ import {
   type StoredExecutionResult,
 } from "../../utils/response-storage";
 import { getActions, setActions } from "../../utils/storage";
+import { ACTION_CONTEXT_LABELS, getContextMenuContexts } from "../../utils/triggers";
 
 function executeActionInBackground(
   actionId: string,
@@ -270,7 +271,12 @@ export function setupActionsTab(
 
       const contextsDiv = document.createElement("div");
       contextsDiv.className = "d-flex gap-1 flex-shrink-0";
-      (action.contexts || ["page"]).forEach((c) => {
+      const triggerLabels = getContextMenuContexts(action.triggers).map(
+        (context) => ACTION_CONTEXT_LABELS[context],
+      );
+      if (action.triggers.some((trigger) => trigger.type === "pageLoad"))
+        triggerLabels.push("ページ読み込み");
+      triggerLabels.forEach((c) => {
         const cBadge = document.createElement("span");
         cBadge.className = "text-secondary-emphasis bg-secondary-subtle px-1 rounded";
         cBadge.style.fontSize = "0.68rem";
@@ -315,7 +321,7 @@ export function setupActionsTab(
       toggle.type = "checkbox";
       toggle.role = "switch";
       toggle.checked = action.enabled;
-      toggle.title = action.enabled ? "有効 (右クリックメニューに表示)" : "無効";
+      toggle.title = "トリガーを有効にする";
 
       toggle.addEventListener("change", async () => {
         action.enabled = toggle.checked;

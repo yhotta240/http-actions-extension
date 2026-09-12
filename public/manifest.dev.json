@@ -11,6 +11,7 @@
     "scripting",
     "storage",
     "contextMenus",
+    "webNavigation",
     "notifications",
     "tabs",
     "offscreen"

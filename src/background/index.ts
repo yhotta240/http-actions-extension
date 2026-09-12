@@ -13,7 +13,7 @@ import {
   type PreparedRequestExecutor,
   showExecutionNotification,
 } from "../utils/executor";
-import { logError, logInfo } from "../utils/logger";
+import { logError, logInfo, logWarn } from "../utils/logger";
 import { getLatestExecutionResult, saveLatestExecutionResult } from "../utils/response-storage";
 import {
   ACTIONS_STORAGE_KEY,
@@ -23,6 +23,7 @@ import {
   removeSessionStorage,
   setSessionStorage,
 } from "../utils/storage";
+import { getContextMenuContexts, matchesPageLoad } from "../utils/triggers";
 
 const ROOT_MENU_ID = "http_actions_root";
 const OFFSCREEN_DOCUMENT_PATH = "offscreen.html";
@@ -326,7 +327,9 @@ export async function updateContextMenus(): Promise<void> {
     }
 
     const actions = await getActions();
-    const enabledActions = actions.filter((a) => a.enabled);
+    const enabledActions = actions.filter(
+      (action) => action.enabled && getContextMenuContexts(action.triggers).length > 0,
+    );
 
     if (enabledActions.length === 0) {
       return;
@@ -346,15 +349,7 @@ export async function updateContextMenus(): Promise<void> {
 
     // Create item for each action
     for (const action of enabledActions) {
-      const rawContexts =
-        action.contexts && action.contexts.length > 0
-          ? action.contexts.map(mapContextToChrome)
-          : [
-              chrome.contextMenus.ContextType.PAGE,
-              chrome.contextMenus.ContextType.SELECTION,
-              chrome.contextMenus.ContextType.LINK,
-              chrome.contextMenus.ContextType.IMAGE,
-            ];
+      const rawContexts = getContextMenuContexts(action.triggers).map(mapContextToChrome);
 
       const contexts: [
         `${chrome.contextMenus.ContextType}`,
@@ -407,6 +402,13 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (!menuId.startsWith("action_")) return;
 
   const actionId = menuId.replace("action_", "");
+  const action = await findActionById(actionId);
+  if (
+    !action?.enabled ||
+    !(await isEnabled()) ||
+    getContextMenuContexts(action.triggers).length === 0
+  )
+    return;
   // Build page context
   const pageContext: ExecutionPageContext = {
     url: tab?.url || info.pageUrl,
@@ -427,6 +429,62 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   // Execute
   await startActionById(actionId, pageContext);
 });
+
+async function handlePageLoad(
+  details: chrome.webNavigation.WebNavigationFramedCallbackDetails,
+): Promise<void> {
+  if (
+    details.frameId !== 0 ||
+    (details.documentLifecycle && details.documentLifecycle !== "active")
+  )
+    return;
+  const url = new URL(details.url);
+  if (url.protocol !== "http:" && url.protocol !== "https:") return;
+  if (!(await isEnabled())) return;
+
+  const actions = (await getActions()).filter(
+    (action) => action.enabled && action.triggers.some((trigger) => trigger.type === "pageLoad"),
+  );
+  if (actions.length === 0) return;
+
+  // 対象タブの情報を使う。読み込み後に閉じられた／別ページへ移動したタブは評価しない。
+  const tab = await chrome.tabs.get(details.tabId).catch(() => undefined);
+  if (!tab || tab.url !== details.url) return;
+  const pageContext: ExecutionPageContext = {
+    url: details.url,
+    domain: url.hostname,
+    title: tab.title,
+  };
+
+  await Promise.all(
+    actions
+      .filter((action) => matchesPageLoad(action.triggers, pageContext))
+      .map(async (action) => {
+        try {
+          if (action.inputs?.length) {
+            await logWarn(
+              `「${action.name}」のページ読み込みによる自動実行をスキップしました（実行時入力あり）`,
+              "background",
+            );
+            return;
+          }
+          await executeActionById(action.id, pageContext);
+        } catch (error) {
+          await logError(
+            `「${action.name}」のページ読み込みによる自動実行に失敗しました`,
+            "background",
+            error,
+          );
+        }
+      }),
+  );
+}
+
+chrome.webNavigation.onCompleted.addListener((details) =>
+  handlePageLoad(details).catch((error: unknown) =>
+    logError("ページ読み込みの処理に失敗しました", "background", error),
+  ),
+);
 
 chrome.notifications.onClicked.addListener((notificationId) => {
   if (notificationId !== EXECUTION_NOTIFICATION_ID) return;
