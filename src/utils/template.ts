@@ -32,7 +32,7 @@ export function interpolateTemplate(
     const key = rawKey.trim();
     let value = "";
 
-    if (key === "selection") {
+    if (key === "page.selection") {
       value = page.selection ?? "";
     } else if (key === "page.url") {
       value = page.url ?? "";
