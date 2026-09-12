@@ -47,11 +47,13 @@ interface ExecutionInputPageData {
 }
 
 type ExecuteActionResponse = ExecutionResult | ExecutionInputRequired;
+type ChromeContextType = `${chrome.contextMenus.ContextType}`;
+type ChromeContextTypes = [ChromeContextType, ...ChromeContextType[]];
 
 /**
  * Maps ActionContext to Chrome ContextMenus ContextType
  */
-function mapContextToChrome(context: ActionContext): `${chrome.contextMenus.ContextType}` {
+function mapContextToChrome(context: ActionContext): ChromeContextType {
   switch (context) {
     case "selection":
       return chrome.contextMenus.ContextType.SELECTION;
@@ -63,9 +65,6 @@ function mapContextToChrome(context: ActionContext): `${chrome.contextMenus.Cont
       return chrome.contextMenus.ContextType.PAGE;
   }
 }
-
-type ChromeContextType = `${chrome.contextMenus.ContextType}`;
-type ChromeContextTypes = [ChromeContextType, ...ChromeContextType[]];
 
 function getParentMenuContexts(actions: Array<{ triggers: ActionTrigger[] }>): ChromeContextTypes {
   const contextSet = new Set<ChromeContextType>();
@@ -365,10 +364,10 @@ export async function updateContextMenus(): Promise<void> {
     for (const action of enabledActions) {
       const rawContexts = getContextMenuContexts(action.triggers).map(mapContextToChrome);
 
-      const contexts: [
-        `${chrome.contextMenus.ContextType}`,
-        ...`${chrome.contextMenus.ContextType}`[],
-      ] = [rawContexts[0] ?? chrome.contextMenus.ContextType.PAGE, ...rawContexts.slice(1)];
+      const contexts: ChromeContextTypes = [
+        rawContexts[0] ?? chrome.contextMenus.ContextType.PAGE,
+        ...rawContexts.slice(1),
+      ];
 
       await createMenuItem({
         id: `action_${action.id}`,
