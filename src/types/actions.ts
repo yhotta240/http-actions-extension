@@ -46,7 +46,9 @@ export interface ExecutionPageContext {
   linkUrl?: string;
   imageUrl?: string;
   videoUrl?: string;
+  videoDirectUrl?: string;
   audioUrl?: string;
+  audioDirectUrl?: string;
 }
 
 export interface ExecutionResult {

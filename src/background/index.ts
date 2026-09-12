@@ -1,6 +1,7 @@
 import { EXECUTION_NOTIFICATION_ID } from "../utils/executor";
 import { logError, logInfo } from "../utils/logger";
 import { ACTIONS_STORAGE_KEY } from "../utils/storage";
+import { clearMediaRequestCandidates, registerMediaRequestTracking } from "./media-requests";
 import { handleRuntimeMessage } from "./messages";
 import { handleContextMenuClick, updateContextMenus } from "./triggers/context-menus";
 import { handlePageLoad } from "./triggers/page-load";
@@ -33,6 +34,13 @@ chrome.storage.onChanged.addListener(async (changes, area) => {
 });
 
 chrome.contextMenus.onClicked.addListener(handleContextMenuClick);
+registerMediaRequestTracking();
+chrome.webNavigation.onCommitted.addListener(({ tabId, frameId }) => {
+  clearMediaRequestCandidates(tabId, frameId);
+});
+chrome.tabs.onRemoved.addListener((tabId) => {
+  clearMediaRequestCandidates(tabId);
+});
 chrome.webNavigation.onCompleted.addListener((details) =>
   handlePageLoad(details).catch((error: unknown) =>
     logError("ページ読み込みの処理に失敗しました", "background", error),

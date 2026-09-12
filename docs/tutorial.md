@@ -80,7 +80,9 @@ Rawモードでは，JSONやプレーンテキストをそのまま入力でき�
 - `{{link.url}}`: 対象リンクのURL
 - `{{image.url}}`: 対象画像のURL
 - `{{video.url}}`: 対象動画のURL
+- `{{video.directUrl}}`: blob URLではない動画の配信候補URL（複数ある場合は最後に取得した候補）
 - `{{audio.url}}`: 対象音声のURL
+- `{{audio.directUrl}}`: blob URLではない音声の配信候補URL（複数ある場合は最後に取得した候補）
 - `{{var.キー名}}`: ユーザー定義変数
 - `{{secret.キー名}}`: シークレット
 

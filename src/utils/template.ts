@@ -54,8 +54,12 @@ export function interpolateTemplate(
       value = page.imageUrl ?? "";
     } else if (key === "video.url") {
       value = page.videoUrl ?? "";
+    } else if (key === "video.directUrl") {
+      value = page.videoDirectUrl ?? "";
     } else if (key === "audio.url") {
       value = page.audioUrl ?? "";
+    } else if (key === "audio.directUrl") {
+      value = page.audioDirectUrl ?? "";
     } else if (key.startsWith("var.")) {
       const varKey = key.slice(4);
       value = variables[varKey] ?? "";
