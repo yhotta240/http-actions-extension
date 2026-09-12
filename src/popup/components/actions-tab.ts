@@ -67,6 +67,27 @@ function formatResponseHeaders(headers: Record<string, string> | undefined): str
     .join("\n");
 }
 
+function createCopyButton(text: string, label: string): HTMLButtonElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "icon-action-btn response-copy-btn ms-auto";
+  button.title = `${label}をコピー`;
+  button.setAttribute("aria-label", `${label}をコピー`);
+
+  const icon = document.createElement("i");
+  icon.className = "bi bi-copy";
+  button.appendChild(icon);
+
+  button.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    void navigator.clipboard.writeText(text).catch(() => undefined);
+  });
+
+  return button;
+}
+
 function renderExecutionResult(
   container: HTMLElement,
   result: ExecutionResult | StoredExecutionResult,
@@ -106,18 +127,29 @@ function renderExecutionResult(
 
   const headersDetails = document.createElement("details");
   const headersSummary = document.createElement("summary");
-  headersSummary.textContent = "Headers";
+  headersSummary.className = "position-relative pe-4";
+  const headersLabel = document.createElement("span");
+  headersLabel.textContent = "Headers";
+  headersSummary.appendChild(headersLabel);
+  const formattedResponseHeaders = formatResponseHeaders(result.responseHeaders);
+  const headersCopyButton = createCopyButton(formattedResponseHeaders, "Headers");
+  headersCopyButton.classList.add("position-absolute", "end-0", "top-50", "translate-middle-y");
+  headersSummary.appendChild(headersCopyButton);
   headersDetails.appendChild(headersSummary);
   const responseHeaders = document.createElement("pre");
   responseHeaders.className = "small border rounded p-2 mt-1 overflow-auto";
-  responseHeaders.textContent = formatResponseHeaders(result.responseHeaders);
+  responseHeaders.textContent = formattedResponseHeaders;
   headersDetails.appendChild(responseHeaders);
   details.appendChild(headersDetails);
 
-  const responseLabel = document.createElement("div");
-  responseLabel.className = "fw-semibold mt-1";
+  const responseHeading = document.createElement("div");
+  responseHeading.className = "d-flex align-items-center gap-2 fw-semibold mt-1";
+  const responseLabel = document.createElement("span");
   responseLabel.textContent = "Response";
-  details.appendChild(responseLabel);
+  responseHeading.appendChild(responseLabel);
+  const formattedResponseBody = formatResponseBody(result.responseBody);
+  responseHeading.appendChild(createCopyButton(formattedResponseBody, "Response"));
+  details.appendChild(responseHeading);
 
   if ("responseBodyTruncated" in result && result.responseBodyTruncated) {
     const limitMessage = document.createElement("div");
@@ -129,7 +161,7 @@ function renderExecutionResult(
   const responseBody = document.createElement("pre");
   responseBody.className = "small border rounded p-2 mb-1 mt-1 overflow-auto";
   responseBody.style.maxHeight = "240px";
-  responseBody.textContent = formatResponseBody(result.responseBody);
+  responseBody.textContent = formattedResponseBody;
   details.appendChild(responseBody);
 
   container.appendChild(summaryLine);
