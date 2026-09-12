@@ -1,6 +1,8 @@
-import type { ActionContext, ActionInput, HttpAction, HttpMethod } from "../../types/actions";
+import type { ActionInput, HttpAction, HttpMethod } from "../../types/actions";
 import { validateActionInputDefinitions } from "../../utils/action-inputs";
 import { getActions, setActions } from "../../utils/storage";
+import { validateTriggers } from "../../utils/triggers";
+import { setupTriggerEditor } from "./trigger-editor";
 
 const COMMON_HEADERS = [
   "Content-Type",
@@ -85,27 +87,8 @@ export function setupActionEditor(
           </div>
         </details>
 
-        <div class="mb-2">
-          <label class="form-label small mb-1 fw-semibold">使用可能な Context (右クリック表示条件)</label>
-          <div class="d-flex gap-3 flex-wrap small">
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" id="ctx-page" value="page" checked>
-              <label class="form-check-label" for="ctx-page">Page</label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" id="ctx-selection" value="selection" checked>
-              <label class="form-check-label" for="ctx-selection">Selection</label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" id="ctx-link" value="link" checked>
-              <label class="form-check-label" for="ctx-link">Link</label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" id="ctx-image" value="image">
-              <label class="form-check-label" for="ctx-image">Image</label>
-            </div>
-          </div>
-        </div>
+        <div id="action-triggers-container" class="mb-2"></div>
+        <p id="trigger-input-warning" class="small text-warning-emphasis d-none">実行時入力があるため，ページ読み込みによる自動実行はスキップされます</p>
 
         <!-- Headers Key-Value -->
         <div class="mb-3 pt-2">
@@ -206,10 +189,19 @@ export function setupActionEditor(
   const actionInputsContainer = container.querySelector("#action-inputs-container") as HTMLElement;
   const btnAddActionInput = container.querySelector("#btn-add-action-input") as HTMLButtonElement;
 
-  const chkPage = container.querySelector("#ctx-page") as HTMLInputElement;
-  const chkSelection = container.querySelector("#ctx-selection") as HTMLInputElement;
-  const chkLink = container.querySelector("#ctx-link") as HTMLInputElement;
-  const chkImage = container.querySelector("#ctx-image") as HTMLInputElement;
+  const triggerInputWarning = container.querySelector("#trigger-input-warning") as HTMLElement;
+  const triggerEditor = setupTriggerEditor(
+    container.querySelector("#action-triggers-container") as HTMLElement,
+    updateTriggerInputWarning,
+  );
+
+  function updateTriggerInputWarning(): void {
+    const hasPageLoad = triggerEditor.getTriggers().some((trigger) => trigger.type === "pageLoad");
+    triggerInputWarning.classList.toggle(
+      "d-none",
+      !hasPageLoad || actionInputsContainer.children.length === 0,
+    );
+  }
 
   // Header Elements
   const headersContainer = container.querySelector("#headers-rows-container") as HTMLElement;
@@ -254,8 +246,12 @@ export function setupActionEditor(
     typeInput.value = input.type ?? "text";
     requiredInput.checked = input.required ?? true;
 
-    row.querySelector(".btn-remove-action-input")?.addEventListener("click", () => row.remove());
+    row.querySelector(".btn-remove-action-input")?.addEventListener("click", () => {
+      row.remove();
+      updateTriggerInputWarning();
+    });
     actionInputsContainer.appendChild(row);
+    updateTriggerInputWarning();
   };
 
   const collectActionInputs = (): ActionInput[] => {
@@ -402,7 +398,7 @@ export function setupActionEditor(
       <button type="button" class="btn btn-outline-secondary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false" title="変数を挿入">
       </button>
       <ul class="dropdown-menu dropdown-menu-end small">
-        <li><a class="dropdown-item insert-var" href="#" data-val="{{selection}}">{{selection}} (選択文字列)</a></li>
+        <li><a class="dropdown-item insert-var" href="#" data-val="{{selection}}">{{selection}} (選択テキスト)</a></li>
         <li><a class="dropdown-item insert-var" href="#" data-val="{{page.url}}">{{page.url}} (URL)</a></li>
         <li><a class="dropdown-item insert-var" href="#" data-val="{{page.title}}">{{page.title}} (タイトル)</a></li>
         <li><a class="dropdown-item insert-var" href="#" data-val="{{link.url}}">{{link.url}} (リンクURL)</a></li>
@@ -557,10 +553,7 @@ export function setupActionEditor(
     bodyKvPanel.classList.remove("d-none");
     bodyRawPanel.classList.add("d-none");
 
-    chkPage.checked = true;
-    chkSelection.checked = true;
-    chkLink.checked = true;
-    chkImage.checked = false;
+    triggerEditor.setTriggers([]);
   };
 
   btnCancelEdit.addEventListener("click", () => resetForm());
@@ -642,11 +635,7 @@ export function setupActionEditor(
       bodyRawPanel.classList.remove("d-none");
     }
 
-    const ctxs = action.contexts || [];
-    chkPage.checked = ctxs.includes("page");
-    chkSelection.checked = ctxs.includes("selection");
-    chkLink.checked = ctxs.includes("link");
-    chkImage.checked = ctxs.includes("image");
+    triggerEditor.setTriggers(action.triggers);
 
     if (action.method === "GET") {
       bodyContainer.classList.add("opacity-50");
@@ -721,11 +710,12 @@ export function setupActionEditor(
       }
     }
 
-    const contexts: ActionContext[] = [];
-    if (chkPage.checked) contexts.push("page");
-    if (chkSelection.checked) contexts.push("selection");
-    if (chkLink.checked) contexts.push("link");
-    if (chkImage.checked) contexts.push("image");
+    const triggers = triggerEditor.getTriggers();
+    const triggerValidation = validateTriggers(triggers);
+    if (!triggerValidation.valid) {
+      alert(triggerValidation.error);
+      return;
+    }
 
     const actions = await getActions();
 
@@ -739,7 +729,7 @@ export function setupActionEditor(
           url: inputUrl.value.trim(),
           headers: finalHeaders,
           body: finalBody,
-          contexts,
+          triggers,
         };
         if (actionInputs.length === 0) {
           delete updatedAction.inputs;
@@ -761,7 +751,7 @@ export function setupActionEditor(
         url: inputUrl.value.trim(),
         headers: finalHeaders,
         body: finalBody,
-        contexts,
+        triggers,
         enabled: true,
         order: actions.length,
         ...(actionInputs.length === 0 ? {} : { inputs: actionInputs }),

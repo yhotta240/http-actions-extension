@@ -2,6 +2,16 @@ export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 export type ActionContext = "page" | "selection" | "link" | "image";
 
+export interface TriggerCondition {
+  target: "url" | "domain" | "title";
+  operator: "equals" | "contains" | "startsWith" | "endsWith" | "matches";
+  value: string;
+}
+
+export type ActionTrigger =
+  | { type: "contextMenu"; contexts: ActionContext[] }
+  | { type: "pageLoad"; conditions: TriggerCondition[] };
+
 export type ActionInputType = "text" | "password";
 
 export interface ActionInput {
@@ -19,7 +29,7 @@ export interface HttpAction {
   body: string;
   timeoutMs?: number;
   inputs?: ActionInput[];
-  contexts: ActionContext[];
+  triggers: ActionTrigger[];
   enabled: boolean;
   order: number;
 }
