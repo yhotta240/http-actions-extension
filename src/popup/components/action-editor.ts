@@ -404,7 +404,9 @@ export function setupActionEditor(
         <li><a class="dropdown-item insert-var" href="#" data-val="{{link.url}}">{{link.url}} (リンクURL)</a></li>
         <li><a class="dropdown-item insert-var" href="#" data-val="{{image.url}}">{{image.url}} (画像URL)</a></li>
         <li><a class="dropdown-item insert-var" href="#" data-val="{{video.url}}">{{video.url}} (動画URL)</a></li>
+        <li><a class="dropdown-item insert-var" href="#" data-val="{{video.directUrl}}">{{video.directUrl}} (動画配信URL)</a></li>
         <li><a class="dropdown-item insert-var" href="#" data-val="{{audio.url}}">{{audio.url}} (音声URL)</a></li>
+        <li><a class="dropdown-item insert-var" href="#" data-val="{{audio.directUrl}}">{{audio.directUrl}} (音声配信URL)</a></li>
       </ul>
       <button type="button" class="btn btn-outline-danger btn-remove-kv-row" title="削除">
         <i class="bi bi-x-lg"></i>

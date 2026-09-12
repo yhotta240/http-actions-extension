@@ -8,22 +8,28 @@ import { getActions, isEnabled } from "../../utils/storage";
 import { getContextMenuContexts } from "../../utils/triggers";
 import { findActionById } from "../execution/actions";
 import { startActionById } from "../execution/input";
+import { resolveDirectMediaUrl } from "../media-requests";
 
 const ROOT_MENU_ID = "http_actions_root";
 type ChromeContextType = `${chrome.contextMenus.ContextType}`;
 type ChromeContextTypes = [ChromeContextType, ...ChromeContextType[]];
 
-interface PendingMediaContext {
-  tabId: number;
-  frameId: number;
+interface MediaContextInfo {
   context: MediaContext;
   url: string;
+  directUrl?: string;
   pageUrl: string;
+}
+
+interface PendingMediaContext extends MediaContextInfo {
+  tabId: number;
+  frameId: number;
 }
 
 const mediaFallbackMenuContexts = new Map<string, MediaContext[]>();
 const regularMenuContexts = new Map<string, ActionContext[]>();
 let pendingMediaContext: PendingMediaContext | undefined;
+let mediaContextVersion = 0;
 let mediaMenuStateReady = false;
 let mediaMenuStateRestoring: Promise<void> | undefined;
 
@@ -275,21 +281,36 @@ export async function handleContextMenuClick(
 
   const actionId = menuId.replace("action_", "");
   const action = await findActionById(actionId);
-  const actionMediaFallbackContexts = action ? getActionMediaFallbackContexts(action) : [];
-  const nativeMediaContext = isMediaContext(info.mediaType) ? info.mediaType : undefined;
-  const pending =
+  let actionMediaFallbackContexts: MediaContext[] = [];
+  if (action) actionMediaFallbackContexts = getActionMediaFallbackContexts(action);
+
+  let pending: PendingMediaContext | undefined;
+  if (
     pendingMediaContext &&
     tab?.id === pendingMediaContext.tabId &&
     info.frameId === pendingMediaContext.frameId
-      ? pendingMediaContext
-      : undefined;
-  const mediaContext = nativeMediaContext
-    ? {
-        context: nativeMediaContext,
-        url: info.srcUrl || "",
-        pageUrl: info.pageUrl || "",
-      }
-    : pending;
+  ) {
+    pending = pendingMediaContext;
+  }
+
+  let mediaContext: MediaContextInfo | undefined = pending;
+  if (isMediaContext(info.mediaType)) {
+    let directUrl: string | undefined;
+    if (tab?.id !== undefined) {
+      directUrl = await resolveDirectMediaUrl(
+        tab.id,
+        info.frameId ?? 0,
+        info.mediaType,
+        info.srcUrl || "",
+      );
+    }
+    mediaContext = {
+      context: info.mediaType,
+      url: info.srcUrl || "",
+      directUrl,
+      pageUrl: info.pageUrl || "",
+    };
+  }
 
   pendingMediaContext = undefined;
   updateMediaMenuVisibility(undefined);
@@ -320,10 +341,20 @@ export async function handleContextMenuClick(
     title: tab?.title || "",
     selection: info.selectionText || "",
     linkUrl: info.linkUrl || "",
-    imageUrl: info.mediaType === "image" ? info.srcUrl || "" : "",
-    videoUrl: mediaContext?.context === "video" ? mediaContext.url : "",
-    audioUrl: mediaContext?.context === "audio" ? mediaContext.url : "",
+    imageUrl: "",
+    videoUrl: "",
+    audioUrl: "",
   };
+
+  if (info.mediaType === "image") pageContext.imageUrl = info.srcUrl || "";
+  if (mediaContext?.context === "video") {
+    pageContext.videoUrl = mediaContext.url;
+    pageContext.videoDirectUrl = mediaContext.directUrl;
+  }
+  if (mediaContext?.context === "audio") {
+    pageContext.audioUrl = mediaContext.url;
+    pageContext.audioDirectUrl = mediaContext.directUrl;
+  }
 
   if (pageContext.url) {
     try {
@@ -340,23 +371,40 @@ export async function handleMediaContext(
   message: { mediaContext?: unknown; mediaUrl?: unknown; pageUrl?: unknown },
   sender: chrome.runtime.MessageSender,
 ): Promise<void> {
-  const mediaContext = isMediaContext(message.mediaContext) ? message.mediaContext : undefined;
+  const version = ++mediaContextVersion;
+  let mediaContext: MediaContext | undefined;
+  if (isMediaContext(message.mediaContext)) mediaContext = message.mediaContext;
   const tabId = sender.tab?.id;
   const frameId = sender.frameId ?? 0;
+  const mediaUrl = getStringValue(message.mediaUrl);
 
   if (tabId !== undefined && mediaContext) {
-    pendingMediaContext = {
+    const nextPendingMediaContext: PendingMediaContext = {
       tabId,
       frameId,
       context: mediaContext,
-      url: typeof message.mediaUrl === "string" ? message.mediaUrl : "",
-      pageUrl: typeof message.pageUrl === "string" ? message.pageUrl : "",
+      url: mediaUrl,
+      pageUrl: getStringValue(message.pageUrl),
     };
+    pendingMediaContext = nextPendingMediaContext;
+    nextPendingMediaContext.directUrl = await resolveDirectMediaUrl(
+      tabId,
+      frameId,
+      mediaContext,
+      mediaUrl,
+    );
+    if (version !== mediaContextVersion) return;
   } else {
     pendingMediaContext = undefined;
   }
 
   await ensureMediaMenuState();
+  if (version !== mediaContextVersion) return;
   // 復元を待つ間に届いた最新の検出結果を反映する。
   updateMediaMenuVisibility(pendingMediaContext?.context);
+}
+
+function getStringValue(value: unknown): string {
+  if (typeof value !== "string") return "";
+  return value;
 }
