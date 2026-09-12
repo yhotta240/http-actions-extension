@@ -15,6 +15,7 @@ export default defineConfig(({ mode }) => {
     ? r("./src/background/dev.ts")
     : r("./src/background/index.ts");
   const inputEntry = r("./src/input/index.ts");
+  const contentEntry = r("./src/content/index.ts");
   const offscreenEntry = r("./src/offscreen/index.ts");
   const offscreenWorkerEntry = r("./src/offscreen/worker.ts");
 
@@ -36,6 +37,7 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         input: {
           background: bgEntry,
+          content: contentEntry,
           input: inputEntry,
           offscreen: offscreenEntry,
           "offscreen-worker": offscreenWorkerEntry,

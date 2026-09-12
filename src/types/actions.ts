@@ -1,6 +1,7 @@
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 export type ActionContext = "page" | "selection" | "link" | "image" | "video" | "audio";
+export type MediaContext = Extract<ActionContext, "video" | "audio">;
 
 export interface TriggerCondition {
   target: "url" | "domain" | "title";

@@ -5,6 +5,7 @@ import type {
   ExecutionInputRequired,
   ExecutionPageContext,
   ExecutionResult,
+  MediaContext,
 } from "../types/actions";
 import { getMissingRequiredActionInputs } from "../utils/action-inputs";
 import {
@@ -50,6 +51,53 @@ type ExecuteActionResponse = ExecutionResult | ExecutionInputRequired;
 type ChromeContextType = `${chrome.contextMenus.ContextType}`;
 type ChromeContextTypes = [ChromeContextType, ...ChromeContextType[]];
 
+interface PendingMediaContext {
+  tabId: number;
+  frameId: number;
+  context: MediaContext;
+  url: string;
+  pageUrl: string;
+}
+
+const mediaFallbackMenuContexts = new Map<string, MediaContext[]>();
+let pendingMediaContext: PendingMediaContext | undefined;
+let hasRegularActions = false;
+
+function getActionMediaFallbackContexts(action: { triggers: ActionTrigger[] }): MediaContext[] {
+  const contexts = getContextMenuContexts(action.triggers);
+  if (contexts.length === 0 || contexts.includes("page") || !contexts.every(isMediaContext)) {
+    return [];
+  }
+  return contexts.filter(isMediaContext);
+}
+
+function isMediaContext(value: unknown): value is MediaContext {
+  return value === "video" || value === "audio";
+}
+
+function updateMediaMenuVisibility(context: MediaContext | undefined): void {
+  console.log("updateMediaMenuVisibility", context, mediaFallbackMenuContexts);
+  if (mediaFallbackMenuContexts.size === 0) return;
+
+  chrome.contextMenus.update(
+    ROOT_MENU_ID,
+    { visible: hasRegularActions || context !== undefined },
+    () => {
+      void chrome.runtime.lastError;
+    },
+  );
+
+  for (const [id, contexts] of mediaFallbackMenuContexts) {
+    chrome.contextMenus.update(
+      id,
+      { visible: context !== undefined && contexts.includes(context) },
+      () => {
+        void chrome.runtime.lastError;
+      },
+    );
+  }
+}
+
 /**
  * Maps ActionContext to Chrome ContextMenus ContextType
  */
@@ -74,7 +122,8 @@ function getParentMenuContexts(actions: Array<{ triggers: ActionTrigger[] }>): C
   const contextSet = new Set<ChromeContextType>();
 
   for (const action of actions) {
-    for (const context of getContextMenuContexts(action.triggers)) {
+    const contexts = getContextMenuContexts(action.triggers);
+    for (const context of contexts) {
       contextSet.add(mapContextToChrome(context));
     }
   }
@@ -340,6 +389,8 @@ export async function updateContextMenus(): Promise<void> {
   try {
     // First clear existing menus cleanly
     await removeAllMenus();
+    mediaFallbackMenuContexts.clear();
+    hasRegularActions = false;
 
     const enabled = await isEnabled();
     if (!enabled) {
@@ -355,30 +406,53 @@ export async function updateContextMenus(): Promise<void> {
       return;
     }
 
-    const parentContexts = getParentMenuContexts(enabledActions);
+    const regularActions = enabledActions.filter(
+      (action) => getActionMediaFallbackContexts(action).length === 0,
+    );
+    const mediaActions = enabledActions.filter(
+      (action) => getActionMediaFallbackContexts(action).length > 0,
+    );
 
-    // Create parent menu
+    hasRegularActions = regularActions.length > 0;
+    const parentContexts = getParentMenuContexts(enabledActions);
+    if (mediaActions.length > 0 && !parentContexts.includes(chrome.contextMenus.ContextType.PAGE)) {
+      parentContexts.push(chrome.contextMenus.ContextType.PAGE);
+    }
+
     await createMenuItem({
       id: ROOT_MENU_ID,
       title: "HTTP Actions",
       contexts: parentContexts,
+      visible: hasRegularActions,
     });
 
-    // Create item for each action
-    for (const action of enabledActions) {
-      const rawContexts = getContextMenuContexts(action.triggers).map(mapContextToChrome);
+    for (const action of regularActions) {
+      const actionContexts = getContextMenuContexts(action.triggers);
 
-      const contexts: ChromeContextTypes = [
-        rawContexts[0] ?? chrome.contextMenus.ContextType.PAGE,
-        ...rawContexts.slice(1),
-      ];
+      await createMenuItem({
+        id: `action_${action.id}`,
+        parentId: ROOT_MENU_ID,
+        title: `${action.method} ${action.name}`,
+        contexts: actionContexts.map(mapContextToChrome) as ChromeContextTypes,
+      });
+    }
+
+    for (const action of mediaActions) {
+      const mediaFallbackContexts = getActionMediaFallbackContexts(action);
+      const contexts = [
+        chrome.contextMenus.ContextType.PAGE,
+        ...mediaFallbackContexts.map(mapContextToChrome),
+      ] as ChromeContextTypes;
 
       await createMenuItem({
         id: `action_${action.id}`,
         parentId: ROOT_MENU_ID,
         title: `${action.method} ${action.name}`,
         contexts,
+        visible: false,
       });
+
+      mediaFallbackMenuContexts.set(`action_${action.id}`, mediaFallbackContexts);
     }
   } finally {
     isUpdatingMenus = false;
@@ -420,21 +494,48 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
   const actionId = menuId.replace("action_", "");
   const action = await findActionById(actionId);
+  const actionMediaFallbackContexts = action ? getActionMediaFallbackContexts(action) : [];
+  const nativeMediaContext = isMediaContext(info.mediaType) ? info.mediaType : undefined;
+  const pending =
+    pendingMediaContext &&
+    tab?.id === pendingMediaContext.tabId &&
+    info.frameId === pendingMediaContext.frameId
+      ? pendingMediaContext
+      : undefined;
+  const mediaContext = nativeMediaContext
+    ? {
+        context: nativeMediaContext,
+        url: info.srcUrl || "",
+        pageUrl: info.pageUrl || "",
+      }
+    : pending;
+
+  pendingMediaContext = undefined;
+  updateMediaMenuVisibility(undefined);
+
   if (
     !action?.enabled ||
     !(await isEnabled()) ||
     getContextMenuContexts(action.triggers).length === 0
   )
     return;
+
+  if (
+    actionMediaFallbackContexts.length > 0 &&
+    (!mediaContext || !actionMediaFallbackContexts.includes(mediaContext.context))
+  ) {
+    return;
+  }
+
   // Build page context
   const pageContext: ExecutionPageContext = {
-    url: tab?.url || info.pageUrl,
+    url: tab?.url || info.pageUrl || mediaContext?.pageUrl,
     title: tab?.title || "",
     selection: info.selectionText || "",
     linkUrl: info.linkUrl || "",
     imageUrl: info.mediaType === "image" ? info.srcUrl || "" : "",
-    videoUrl: info.mediaType === "video" ? info.srcUrl || "" : "",
-    audioUrl: info.mediaType === "audio" ? info.srcUrl || "" : "",
+    videoUrl: mediaContext?.context === "video" ? mediaContext.url : "",
+    audioUrl: mediaContext?.context === "audio" ? mediaContext.url : "",
   };
 
   if (pageContext.url) {
@@ -513,7 +614,28 @@ chrome.notifications.onClicked.addListener((notificationId) => {
 });
 
 // Listen for messages from popup (e.g. manual execution or menu refresh)
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === "MEDIA_CONTEXT") {
+    const mediaContext = isMediaContext(message.mediaContext) ? message.mediaContext : undefined;
+    const tabId = sender.tab?.id;
+    const frameId = sender.frameId ?? 0;
+
+    if (tabId !== undefined && mediaContext) {
+      pendingMediaContext = {
+        tabId,
+        frameId,
+        context: mediaContext,
+        url: typeof message.mediaUrl === "string" ? message.mediaUrl : "",
+        pageUrl: typeof message.pageUrl === "string" ? message.pageUrl : "",
+      };
+    } else {
+      pendingMediaContext = undefined;
+    }
+
+    updateMediaMenuVisibility(mediaContext);
+    return false;
+  }
+
   if (message?.type === "EXECUTE_ACTION") {
     const actionId = typeof message.actionId === "string" ? message.actionId : "";
     const pageContext = (message.pageContext ?? {}) as ExecutionPageContext;
