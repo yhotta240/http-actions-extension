@@ -52,6 +52,8 @@ type ExecuteActionResponse = ExecutionResult | ExecutionInputRequired;
  */
 function mapContextToChrome(context: ActionContext): `${chrome.contextMenus.ContextType}` {
   switch (context) {
+    case "page":
+      return chrome.contextMenus.ContextType.ALL;
     case "selection":
       return chrome.contextMenus.ContextType.SELECTION;
     case "link":
@@ -335,16 +337,22 @@ export async function updateContextMenus(): Promise<void> {
       return;
     }
 
+    const hasPageContext = enabledActions.some((action) =>
+      getContextMenuContexts(action.triggers).includes("page"),
+    );
+
     // Create parent menu
     await createMenuItem({
       id: ROOT_MENU_ID,
       title: "HTTP Actions",
-      contexts: [
-        chrome.contextMenus.ContextType.PAGE,
-        chrome.contextMenus.ContextType.SELECTION,
-        chrome.contextMenus.ContextType.LINK,
-        chrome.contextMenus.ContextType.IMAGE,
-      ],
+      contexts: hasPageContext
+        ? [chrome.contextMenus.ContextType.ALL]
+        : [
+            chrome.contextMenus.ContextType.PAGE,
+            chrome.contextMenus.ContextType.SELECTION,
+            chrome.contextMenus.ContextType.LINK,
+            chrome.contextMenus.ContextType.IMAGE,
+          ],
     });
 
     // Create item for each action
