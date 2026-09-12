@@ -82,13 +82,23 @@ function updateMediaMenuVisibility(context: MediaContext | undefined): void {
   const hasMatchingMediaAction =
     context !== undefined &&
     [...mediaFallbackMenuContexts.values()].some((contexts) => contexts.includes(context));
-  const hasVisibleRegularAction = [...regularMenuContexts.values()].some((contexts) =>
-    isRegularMenuVisible(contexts, context),
-  );
+  const parentContexts = new Set<ChromeContextType>([
+    ...[...regularMenuContexts.values()]
+      .filter((contexts) => isRegularMenuVisible(contexts, context))
+      .flatMap((contexts) => contexts.map(mapContextToChrome)),
+    ...[...mediaFallbackMenuContexts.values()].flatMap((contexts) =>
+      contexts.map(mapContextToChrome),
+    ),
+  ]);
+  if (hasMatchingMediaAction) parentContexts.add(chrome.contextMenus.ContextType.PAGE);
+  const contexts = [...parentContexts];
 
   chrome.contextMenus.update(
     ROOT_MENU_ID,
-    { visible: hasVisibleRegularAction || hasMatchingMediaAction },
+    {
+      visible: contexts.length > 0,
+      contexts: [contexts[0] ?? chrome.contextMenus.ContextType.PAGE, ...contexts.slice(1)],
+    },
     () => {
       void chrome.runtime.lastError;
     },
@@ -101,13 +111,14 @@ function updateMediaMenuVisibility(context: MediaContext | undefined): void {
   }
 
   for (const [id, contexts] of mediaFallbackMenuContexts) {
-    chrome.contextMenus.update(
-      id,
-      { visible: context !== undefined && contexts.includes(context) },
-      () => {
-        void chrome.runtime.lastError;
-      },
-    );
+    // 標準の動画・音声メニューは常に利用可能にし、検出時だけオーバーレイを補完する。
+    const menuContexts = contexts.map(mapContextToChrome) as ChromeContextTypes;
+    if (context !== undefined && contexts.includes(context)) {
+      menuContexts.push(chrome.contextMenus.ContextType.PAGE);
+    }
+    chrome.contextMenus.update(id, { visible: true, contexts: menuContexts }, () => {
+      void chrome.runtime.lastError;
+    });
   }
 }
 
@@ -210,15 +221,12 @@ export async function updateContextMenus(): Promise<void> {
     );
 
     const parentContexts = getParentMenuContexts(enabledActions);
-    if (mediaActions.length > 0 && !parentContexts.includes(chrome.contextMenus.ContextType.PAGE)) {
-      parentContexts.push(chrome.contextMenus.ContextType.PAGE);
-    }
 
     await createMenuItem({
       id: ROOT_MENU_ID,
       title: "HTTP Actions",
       contexts: parentContexts,
-      visible: regularActions.length > 0,
+      visible: true,
     });
 
     for (const action of regularActions) {
@@ -235,17 +243,14 @@ export async function updateContextMenus(): Promise<void> {
 
     for (const action of mediaActions) {
       const mediaFallbackContexts = getActionMediaFallbackContexts(action);
-      const contexts = [
-        chrome.contextMenus.ContextType.PAGE,
-        ...mediaFallbackContexts.map(mapContextToChrome),
-      ] as ChromeContextTypes;
+      const contexts = mediaFallbackContexts.map(mapContextToChrome) as ChromeContextTypes;
 
       await createMenuItem({
         id: `action_${action.id}`,
         parentId: ROOT_MENU_ID,
         title: `${action.method} ${action.name}`,
         contexts,
-        visible: false,
+        visible: true,
       });
 
       mediaFallbackMenuContexts.set(`action_${action.id}`, mediaFallbackContexts);
