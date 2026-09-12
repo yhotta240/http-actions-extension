@@ -190,7 +190,14 @@ function isHttpMethod(value: unknown): value is HttpMethod {
 }
 
 function isActionContext(value: unknown): value is ActionContext {
-  return value === "page" || value === "selection" || value === "link" || value === "image";
+  return (
+    value === "page" ||
+    value === "selection" ||
+    value === "link" ||
+    value === "image" ||
+    value === "video" ||
+    value === "audio"
+  );
 }
 
 function isActionInput(value: unknown): boolean {

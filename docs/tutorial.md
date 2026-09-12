@@ -79,6 +79,8 @@ Rawモードでは，JSONやプレーンテキストをそのまま入力でき�
 - `{{page.selection}}`: 選択テキスト
 - `{{link.url}}`: 対象リンクのURL
 - `{{image.url}}`: 対象画像のURL
+- `{{video.url}}`: 対象動画のURL
+- `{{audio.url}}`: 対象音声のURL
 - `{{var.キー名}}`: ユーザー定義変数
 - `{{secret.キー名}}`: シークレット
 

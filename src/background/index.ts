@@ -61,6 +61,10 @@ function mapContextToChrome(context: ActionContext): ChromeContextType {
       return chrome.contextMenus.ContextType.LINK;
     case "image":
       return chrome.contextMenus.ContextType.IMAGE;
+    case "video":
+      return chrome.contextMenus.ContextType.VIDEO;
+    case "audio":
+      return chrome.contextMenus.ContextType.AUDIO;
     default:
       return chrome.contextMenus.ContextType.PAGE;
   }
@@ -428,7 +432,9 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     title: tab?.title || "",
     selection: info.selectionText || "",
     linkUrl: info.linkUrl || "",
-    imageUrl: info.srcUrl || "",
+    imageUrl: info.mediaType === "image" ? info.srcUrl || "" : "",
+    videoUrl: info.mediaType === "video" ? info.srcUrl || "" : "",
+    audioUrl: info.mediaType === "audio" ? info.srcUrl || "" : "",
   };
 
   if (pageContext.url) {

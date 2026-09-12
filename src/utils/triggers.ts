@@ -5,12 +5,21 @@ import type {
   TriggerCondition,
 } from "../types/actions";
 
-export const ACTION_CONTEXTS: ActionContext[] = ["page", "selection", "link", "image"];
+export const ACTION_CONTEXTS: ActionContext[] = [
+  "page",
+  "selection",
+  "link",
+  "image",
+  "video",
+  "audio",
+];
 export const ACTION_CONTEXT_LABELS: Record<ActionContext, string> = {
   page: "ページ",
   selection: "選択テキスト",
   link: "リンク",
   image: "画像",
+  video: "動画",
+  audio: "音声",
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
