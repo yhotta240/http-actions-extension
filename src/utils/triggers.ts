@@ -8,7 +8,7 @@ import type {
 export const ACTION_CONTEXTS: ActionContext[] = ["page", "selection", "link", "image"];
 export const ACTION_CONTEXT_LABELS: Record<ActionContext, string> = {
   page: "ページ",
-  selection: "選択文字列",
+  selection: "選択テキスト",
   link: "リンク",
   image: "画像",
 };

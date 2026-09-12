@@ -398,7 +398,7 @@ export function setupActionEditor(
       <button type="button" class="btn btn-outline-secondary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false" title="変数を挿入">
       </button>
       <ul class="dropdown-menu dropdown-menu-end small">
-        <li><a class="dropdown-item insert-var" href="#" data-val="{{selection}}">{{selection}} (選択文字列)</a></li>
+        <li><a class="dropdown-item insert-var" href="#" data-val="{{selection}}">{{selection}} (選択テキスト)</a></li>
         <li><a class="dropdown-item insert-var" href="#" data-val="{{page.url}}">{{page.url}} (URL)</a></li>
         <li><a class="dropdown-item insert-var" href="#" data-val="{{page.title}}">{{page.title}} (タイトル)</a></li>
         <li><a class="dropdown-item insert-var" href="#" data-val="{{link.url}}">{{link.url}} (リンクURL)</a></li>

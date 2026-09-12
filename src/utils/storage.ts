@@ -30,7 +30,7 @@ export const DEFAULT_ACTIONS: HttpAction[] = [
   },
   {
     id: "default-selection",
-    name: "選択文字列を送信 (例)",
+    name: "選択テキストを送信 (例)",
     method: "POST",
     url: "https://httpbin.org/post",
     headers: {
