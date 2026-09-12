@@ -1,6 +1,7 @@
 import type {
   ActionContext,
   ActionInput,
+  ActionTrigger,
   ExecutionInputRequired,
   ExecutionPageContext,
   ExecutionResult,
@@ -61,6 +62,22 @@ function mapContextToChrome(context: ActionContext): `${chrome.contextMenus.Cont
     default:
       return chrome.contextMenus.ContextType.PAGE;
   }
+}
+
+type ChromeContextType = `${chrome.contextMenus.ContextType}`;
+type ChromeContextTypes = [ChromeContextType, ...ChromeContextType[]];
+
+function getParentMenuContexts(actions: Array<{ triggers: ActionTrigger[] }>): ChromeContextTypes {
+  const contextSet = new Set<ChromeContextType>();
+
+  for (const action of actions) {
+    for (const context of getContextMenuContexts(action.triggers)) {
+      contextSet.add(mapContextToChrome(context));
+    }
+  }
+
+  const contexts = [...contextSet];
+  return [contexts[0] ?? chrome.contextMenus.ContextType.PAGE, ...contexts.slice(1)];
 }
 
 let isUpdatingMenus = false;
@@ -335,16 +352,13 @@ export async function updateContextMenus(): Promise<void> {
       return;
     }
 
+    const parentContexts = getParentMenuContexts(enabledActions);
+
     // Create parent menu
     await createMenuItem({
       id: ROOT_MENU_ID,
       title: "HTTP Actions",
-      contexts: [
-        chrome.contextMenus.ContextType.PAGE,
-        chrome.contextMenus.ContextType.SELECTION,
-        chrome.contextMenus.ContextType.LINK,
-        chrome.contextMenus.ContextType.IMAGE,
-      ],
+      contexts: parentContexts,
     });
 
     // Create item for each action
