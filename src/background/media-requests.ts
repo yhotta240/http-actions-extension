@@ -24,22 +24,20 @@ function getContentType(responseHeaders: chrome.webRequest.HttpHeader[] | undefi
   return contentType?.split(";", 1)[0].trim().toLowerCase() ?? "";
 }
 
-function getManifestKind(url: string): "manifest" | undefined {
+function isManifestUrl(url: string): boolean {
   try {
     const pathname = new URL(url).pathname.toLowerCase();
-    if (/\.(m3u8|mpd)$/.test(pathname)) return "manifest";
+    return /\.(m3u8|mpd)$/.test(pathname);
   } catch {
-    return undefined;
+    return false;
   }
-  return undefined;
 }
 
 function getMediaKind(
   url: string,
   responseHeaders: chrome.webRequest.HttpHeader[] | undefined,
 ): MediaCandidateKind | undefined {
-  const manifestKind = getManifestKind(url);
-  if (manifestKind) return manifestKind;
+  if (isManifestUrl(url)) return "manifest";
 
   const contentType = getContentType(responseHeaders);
   if (contentType.startsWith("video/")) return "video";
@@ -47,8 +45,25 @@ function getMediaKind(
   return undefined;
 }
 
-function removeExpiredCandidates(candidates: MediaRequestCandidate[], now: number) {
+function removeExpiredCandidates(
+  candidates: MediaRequestCandidate[],
+  now: number,
+): MediaRequestCandidate[] {
   return candidates.filter((candidate) => now - candidate.lastSeenAt <= CANDIDATE_TTL_MS);
+}
+
+function getActiveCandidates(tabId: number, frameId: number, now: number): MediaRequestCandidate[] {
+  const key = frameKey(tabId, frameId);
+  const candidates = removeExpiredCandidates(candidatesByFrame.get(key) ?? [], now);
+  candidatesByFrame.set(key, candidates);
+  return candidates;
+}
+
+function getLatestCandidateUrl(
+  candidates: MediaRequestCandidate[],
+  kind: MediaCandidateKind,
+): string | undefined {
+  return candidates.find((candidate) => candidate.kind === kind)?.url;
 }
 
 export function recordMediaRequest(
@@ -64,12 +79,11 @@ export function recordMediaRequest(
 
   const now = details.timeStamp || Date.now();
   const key = frameKey(details.tabId, details.frameId);
-  const candidates = removeExpiredCandidates(candidatesByFrame.get(key) ?? [], now).filter(
+  const candidates = getActiveCandidates(details.tabId, details.frameId, now).filter(
     (candidate) => candidate.url !== details.url,
   );
   candidates.unshift({ url: details.url, kind, lastSeenAt: now });
-  const storedCandidates = candidates.slice(0, MAX_CANDIDATES_PER_FRAME);
-  candidatesByFrame.set(key, storedCandidates);
+  candidatesByFrame.set(key, candidates.slice(0, MAX_CANDIDATES_PER_FRAME));
 }
 
 export function resolveDirectMediaUrl(
@@ -81,19 +95,10 @@ export function resolveDirectMediaUrl(
   if (HTTP_URL_PATTERN.test(currentUrl)) return currentUrl;
   if (!currentUrl.startsWith("blob:")) return undefined;
 
-  const now = Date.now();
-  const candidates = removeExpiredCandidates(
-    candidatesByFrame.get(frameKey(tabId, frameId)) ?? [],
-    now,
+  const candidates = getActiveCandidates(tabId, frameId, Date.now());
+  return (
+    getLatestCandidateUrl(candidates, "manifest") ?? getLatestCandidateUrl(candidates, context)
   );
-  candidatesByFrame.set(frameKey(tabId, frameId), candidates);
-
-  const manifests = candidates.filter((candidate) => candidate.kind === "manifest");
-  if (manifests.length > 0) return manifests[0].url;
-
-  const mediaCandidates = candidates.filter((candidate) => candidate.kind === context);
-  if (mediaCandidates.length > 0) return mediaCandidates[0].url;
-  return undefined;
 }
 
 export function clearMediaRequestCandidates(tabId: number, frameId?: number): void {

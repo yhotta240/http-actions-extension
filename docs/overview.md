@@ -25,7 +25,7 @@ HTTP Actions は，HTTPリクエストをアクションとして登録し，ポ
 
 ## テンプレート
 
-URL，ヘッダー，本文には，`{{page.url}}`，`{{page.title}}`，`{{page.selection}}`，`{{link.url}}`，`{{image.url}}`，`{{video.url}}`，`{{video.directUrl}}`，`{{audio.url}}`，`{{audio.directUrl}}`などを埋め込めます．`directUrl`はblob URLではない配信候補を利用し，複数ある場合は最後に取得した候補が展開されます．「変数」タブで登録した値は`{{var.キー名}}`，シークレットは`{{secret.キー名}}`で参照できます．
+URL，ヘッダー，本文には，`{{page.url}}`，`{{page.title}}`，`{{page.selection}}`，`{{link.url}}`，`{{image.url}}`，`{{video.url}}`，`{{video.directUrl}}`，`{{audio.url}}`，`{{audio.directUrl}}`などを埋め込めます．「変数」タブで登録した値は`{{var.キー名}}`，シークレットは`{{secret.キー名}}`で参照できます．
 
 アクションに実行時入力を定義した場合は，入力項目のキーを名前空間なしで`{{userId}}`のように参照できます．実行時入力は実行ごとに入力し，保存されません．
 
