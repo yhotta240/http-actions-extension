@@ -1,4 +1,5 @@
 import type { ExecutionPageContext } from "../types/actions";
+import { logError } from "../utils/logger";
 import {
   cancelExecutionInput,
   getExecutionInput,
@@ -14,8 +15,13 @@ export const handleRuntimeMessage: Parameters<typeof chrome.runtime.onMessage.ad
   sendResponse,
 ) => {
   if (message?.type === "MEDIA_CONTEXT") {
-    handleMediaContext(message, sender);
-    return false;
+    handleMediaContext(message, sender)
+      .then(() => sendResponse({ success: true }))
+      .catch((error: unknown) => {
+        logError("メディアメニューの更新に失敗しました", "background", error);
+        sendResponse({ success: false });
+      });
+    return true;
   }
   if (message?.type === "EXECUTE_ACTION") {
     const actionId = typeof message.actionId === "string" ? message.actionId : "";

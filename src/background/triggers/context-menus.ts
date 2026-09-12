@@ -24,6 +24,36 @@ interface PendingMediaContext {
 const mediaFallbackMenuContexts = new Map<string, MediaContext[]>();
 let pendingMediaContext: PendingMediaContext | undefined;
 let hasRegularActions = false;
+let mediaMenuStateReady = false;
+let mediaMenuStateRestoring: Promise<void> | undefined;
+
+// Worker復帰時は既存メニューを作り直さず、表示判定に必要な状態だけ復元する。
+async function ensureMediaMenuState(): Promise<void> {
+  if (mediaMenuStateReady || isUpdatingMenus) return;
+  if (!mediaMenuStateRestoring) {
+    mediaMenuStateRestoring = (async () => {
+      const [enabled, actions] = await Promise.all([isEnabled(), getActions()]);
+      if (mediaMenuStateReady || isUpdatingMenus) return;
+
+      mediaFallbackMenuContexts.clear();
+      hasRegularActions = false;
+      for (const action of actions) {
+        if (!enabled || !action.enabled || getContextMenuContexts(action.triggers).length === 0)
+          continue;
+        const contexts = getActionMediaFallbackContexts(action);
+        if (contexts.length > 0) {
+          mediaFallbackMenuContexts.set(`action_${action.id}`, contexts);
+        } else {
+          hasRegularActions = true;
+        }
+      }
+      mediaMenuStateReady = true;
+    })().finally(() => {
+      mediaMenuStateRestoring = undefined;
+    });
+  }
+  await mediaMenuStateRestoring;
+}
 
 function getActionMediaFallbackContexts(action: { triggers: ActionTrigger[] }): MediaContext[] {
   const contexts = getContextMenuContexts(action.triggers);
@@ -38,12 +68,15 @@ function isMediaContext(value: unknown): value is MediaContext {
 }
 
 function updateMediaMenuVisibility(context: MediaContext | undefined): void {
-  console.log("updateMediaMenuVisibility", context, mediaFallbackMenuContexts);
-  if (mediaFallbackMenuContexts.size === 0) return;
+  if (isUpdatingMenus || mediaFallbackMenuContexts.size === 0) return;
+
+  const hasMatchingMediaAction =
+    context !== undefined &&
+    [...mediaFallbackMenuContexts.values()].some((contexts) => contexts.includes(context));
 
   chrome.contextMenus.update(
     ROOT_MENU_ID,
-    { visible: hasRegularActions || context !== undefined },
+    { visible: hasRegularActions || hasMatchingMediaAction },
     () => {
       void chrome.runtime.lastError;
     },
@@ -127,6 +160,7 @@ export async function updateContextMenus(): Promise<void> {
     return;
   }
   isUpdatingMenus = true;
+  mediaMenuStateReady = false;
 
   try {
     // First clear existing menus cleanly
@@ -136,6 +170,7 @@ export async function updateContextMenus(): Promise<void> {
 
     const enabled = await isEnabled();
     if (!enabled) {
+      mediaMenuStateReady = true;
       return;
     }
 
@@ -145,6 +180,7 @@ export async function updateContextMenus(): Promise<void> {
     );
 
     if (enabledActions.length === 0) {
+      mediaMenuStateReady = true;
       return;
     }
 
@@ -196,8 +232,10 @@ export async function updateContextMenus(): Promise<void> {
 
       mediaFallbackMenuContexts.set(`action_${action.id}`, mediaFallbackContexts);
     }
+    mediaMenuStateReady = true;
   } finally {
     isUpdatingMenus = false;
+    if (mediaMenuStateReady) updateMediaMenuVisibility(pendingMediaContext?.context);
     if (pendingUpdate) {
       pendingUpdate = false;
       updateContextMenus();
@@ -269,10 +307,10 @@ export async function handleContextMenuClick(
   // Execute
   await startActionById(actionId, pageContext);
 }
-export function handleMediaContext(
+export async function handleMediaContext(
   message: { mediaContext?: unknown; mediaUrl?: unknown; pageUrl?: unknown },
   sender: chrome.runtime.MessageSender,
-): void {
+): Promise<void> {
   const mediaContext = isMediaContext(message.mediaContext) ? message.mediaContext : undefined;
   const tabId = sender.tab?.id;
   const frameId = sender.frameId ?? 0;
@@ -289,5 +327,7 @@ export function handleMediaContext(
     pendingMediaContext = undefined;
   }
 
-  updateMediaMenuVisibility(mediaContext);
+  await ensureMediaMenuState();
+  // 復元を待つ間に届いた最新の検出結果を反映する。
+  updateMediaMenuVisibility(pendingMediaContext?.context);
 }
