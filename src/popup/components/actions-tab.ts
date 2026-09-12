@@ -67,6 +67,64 @@ function formatResponseHeaders(headers: Record<string, string> | undefined): str
     .join("\n");
 }
 
+function createCopyButton(text: string, label: string): HTMLButtonElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "icon-action-btn response-copy-btn";
+  button.title = `${label}をコピー`;
+  button.setAttribute("aria-label", `${label}をコピー`);
+
+  const icon = document.createElement("i");
+  icon.className = "bi bi-copy";
+  button.appendChild(icon);
+
+  button.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    void navigator.clipboard.writeText(text).catch(() => undefined);
+  });
+
+  return button;
+}
+
+function createResponseSection(
+  label: string,
+  text: string,
+  open: boolean,
+  maxHeight?: string,
+  notice?: string,
+): HTMLDetailsElement {
+  const section = document.createElement("details");
+  section.open = open;
+
+  const summary = document.createElement("summary");
+  summary.className = "position-relative pe-4";
+  const labelElement = document.createElement("span");
+  labelElement.textContent = label;
+  summary.appendChild(labelElement);
+
+  const copyButton = createCopyButton(text, label);
+  copyButton.classList.add("position-absolute", "end-0", "top-50", "translate-middle-y");
+  summary.appendChild(copyButton);
+  section.appendChild(summary);
+
+  if (notice) {
+    const noticeElement = document.createElement("div");
+    noticeElement.className = "text-warning small";
+    noticeElement.textContent = notice;
+    section.appendChild(noticeElement);
+  }
+
+  const content = document.createElement("pre");
+  content.className = "small border rounded p-2 mt-1 mb-1 overflow-auto";
+  if (maxHeight) content.style.maxHeight = maxHeight;
+  content.textContent = text;
+  section.appendChild(content);
+
+  return section;
+}
+
 function renderExecutionResult(
   container: HTMLElement,
   result: ExecutionResult | StoredExecutionResult,
@@ -104,33 +162,20 @@ function renderExecutionResult(
   });
   summaryLine.appendChild(detailButton);
 
-  const headersDetails = document.createElement("details");
-  const headersSummary = document.createElement("summary");
-  headersSummary.textContent = "Headers";
-  headersDetails.appendChild(headersSummary);
-  const responseHeaders = document.createElement("pre");
-  responseHeaders.className = "small border rounded p-2 mt-1 overflow-auto";
-  responseHeaders.textContent = formatResponseHeaders(result.responseHeaders);
-  headersDetails.appendChild(responseHeaders);
-  details.appendChild(headersDetails);
-
-  const responseLabel = document.createElement("div");
-  responseLabel.className = "fw-semibold mt-1";
-  responseLabel.textContent = "Response";
-  details.appendChild(responseLabel);
-
-  if ("responseBodyTruncated" in result && result.responseBodyTruncated) {
-    const limitMessage = document.createElement("div");
-    limitMessage.className = "text-warning small";
-    limitMessage.textContent = "100KB制限：レスポンスが大きいため一部のみ表示しています";
-    details.appendChild(limitMessage);
-  }
-
-  const responseBody = document.createElement("pre");
-  responseBody.className = "small border rounded p-2 mb-1 mt-1 overflow-auto";
-  responseBody.style.maxHeight = "240px";
-  responseBody.textContent = formatResponseBody(result.responseBody);
-  details.appendChild(responseBody);
+  const formattedResponseHeaders = formatResponseHeaders(result.responseHeaders);
+  const formattedResponseBody = formatResponseBody(result.responseBody);
+  details.appendChild(createResponseSection("Headers", formattedResponseHeaders, false));
+  details.appendChild(
+    createResponseSection(
+      "Response",
+      formattedResponseBody,
+      true,
+      "240px",
+      "responseBodyTruncated" in result && result.responseBodyTruncated
+        ? "100KB制限：レスポンスが大きいため一部のみ表示しています"
+        : undefined,
+    ),
+  );
 
   container.appendChild(summaryLine);
   container.appendChild(details);
