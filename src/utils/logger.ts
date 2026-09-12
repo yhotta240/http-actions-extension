@@ -12,6 +12,7 @@ export interface LogEntry {
 
 export const LOG_STORAGE_KEY = "app_logs";
 const MAX_LOG_SIZE = 200;
+let logWriteQueue = Promise.resolve();
 
 /**
  * 現在日時を "YYYY-MM-DD HH:mm:ss" 形式で返す
@@ -57,26 +58,36 @@ export async function addLog(
     detail: safeDetail,
     hidden,
   };
-  const logs = await getLogs();
-  logs.push(entry);
-  if (logs.length > MAX_LOG_SIZE) {
-    logs.splice(0, logs.length - MAX_LOG_SIZE);
-  }
-  return new Promise((resolve, reject) => {
-    chrome.storage.local.set({ [LOG_STORAGE_KEY]: logs }, () => {
-      if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
-      else resolve();
+  const append = async (): Promise<void> => {
+    const logs = await getLogs();
+    logs.push(entry);
+    if (logs.length > MAX_LOG_SIZE) {
+      logs.splice(0, logs.length - MAX_LOG_SIZE);
+    }
+    return new Promise((resolve, reject) => {
+      chrome.storage.local.set({ [LOG_STORAGE_KEY]: logs }, () => {
+        if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
+        else resolve();
+      });
     });
-  });
+  };
+
+  const result = logWriteQueue.then(append);
+  logWriteQueue = result.catch(() => undefined);
+  return result;
 }
 
 export function clearLogs(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    chrome.storage.local.remove(LOG_STORAGE_KEY, () => {
-      if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
-      else resolve();
+  const clear = () =>
+    new Promise<void>((resolve, reject) => {
+      chrome.storage.local.remove(LOG_STORAGE_KEY, () => {
+        if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
+        else resolve();
+      });
     });
-  });
+  const result = logWriteQueue.then(clear);
+  logWriteQueue = result.catch(() => undefined);
+  return result;
 }
 
 export const logInfo = (message: string, source: LogSource, hidden?: boolean) =>
