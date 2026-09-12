@@ -29,6 +29,7 @@ interface PendingMediaContext extends MediaContextInfo {
 const mediaFallbackMenuContexts = new Map<string, MediaContext[]>();
 const regularMenuContexts = new Map<string, ActionContext[]>();
 let pendingMediaContext: PendingMediaContext | undefined;
+let mediaContextVersion = 0;
 let mediaMenuStateReady = false;
 let mediaMenuStateRestoring: Promise<void> | undefined;
 
@@ -296,7 +297,7 @@ export async function handleContextMenuClick(
   if (isMediaContext(info.mediaType)) {
     let directUrl: string | undefined;
     if (tab?.id !== undefined) {
-      directUrl = resolveDirectMediaUrl(
+      directUrl = await resolveDirectMediaUrl(
         tab.id,
         info.frameId ?? 0,
         info.mediaType,
@@ -370,6 +371,7 @@ export async function handleMediaContext(
   message: { mediaContext?: unknown; mediaUrl?: unknown; pageUrl?: unknown },
   sender: chrome.runtime.MessageSender,
 ): Promise<void> {
+  const version = ++mediaContextVersion;
   let mediaContext: MediaContext | undefined;
   if (isMediaContext(message.mediaContext)) mediaContext = message.mediaContext;
   const tabId = sender.tab?.id;
@@ -377,19 +379,27 @@ export async function handleMediaContext(
   const mediaUrl = getStringValue(message.mediaUrl);
 
   if (tabId !== undefined && mediaContext) {
-    pendingMediaContext = {
+    const nextPendingMediaContext: PendingMediaContext = {
       tabId,
       frameId,
       context: mediaContext,
       url: mediaUrl,
-      directUrl: resolveDirectMediaUrl(tabId, frameId, mediaContext, mediaUrl),
       pageUrl: getStringValue(message.pageUrl),
     };
+    pendingMediaContext = nextPendingMediaContext;
+    nextPendingMediaContext.directUrl = await resolveDirectMediaUrl(
+      tabId,
+      frameId,
+      mediaContext,
+      mediaUrl,
+    );
+    if (version !== mediaContextVersion) return;
   } else {
     pendingMediaContext = undefined;
   }
 
   await ensureMediaMenuState();
+  if (version !== mediaContextVersion) return;
   // 復元を待つ間に届いた最新の検出結果を反映する。
   updateMediaMenuVisibility(pendingMediaContext?.context);
 }

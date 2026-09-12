@@ -35,12 +35,10 @@ chrome.storage.onChanged.addListener(async (changes, area) => {
 
 chrome.contextMenus.onClicked.addListener(handleContextMenuClick);
 registerMediaRequestTracking();
-chrome.webNavigation.onCommitted.addListener(({ tabId, frameId }) => {
-  clearMediaRequestCandidates(tabId, frameId);
-});
-chrome.tabs.onRemoved.addListener((tabId) => {
-  clearMediaRequestCandidates(tabId);
-});
+chrome.webNavigation.onCommitted.addListener(({ tabId, frameId }) =>
+  clearMediaRequestCandidates(tabId, frameId),
+);
+chrome.tabs.onRemoved.addListener((tabId) => clearMediaRequestCandidates(tabId));
 chrome.webNavigation.onCompleted.addListener((details) =>
   handlePageLoad(details).catch((error: unknown) =>
     logError("ページ読み込みの処理に失敗しました", "background", error),
