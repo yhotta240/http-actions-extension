@@ -37,7 +37,7 @@ lang: ja
 
 ```json
 {
-  "text": "{{selection}}",
+  "text": "{{page.selection}}",
   "source": "{{page.url}}"
 }
 ```
@@ -76,7 +76,7 @@ Rawモードでは，JSONやプレーンテキストをそのまま入力でき�
 - `{{page.url}}`: 現在のページURL
 - `{{page.title}}`: ページタイトル
 - `{{page.domain}}`: ページのドメイン
-- `{{selection}}`: 選択テキスト
+- `{{page.selection}}`: 選択テキスト
 - `{{link.url}}`: 対象リンクのURL
 - `{{image.url}}`: 対象画像のURL
 - `{{var.キー名}}`: ユーザー定義変数

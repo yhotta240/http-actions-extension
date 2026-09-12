@@ -3,7 +3,6 @@ import type { ActionInput, HttpAction } from "../types/actions";
 const ACTION_INPUT_KEY_PATTERN = /^[\p{L}\p{N}_-]+$/u;
 const RESERVED_ACTION_INPUT_KEYS = new Set([
   "page",
-  "selection",
   "link",
   "image",
   "var",

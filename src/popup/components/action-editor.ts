@@ -146,14 +146,14 @@ export function setupActionEditor(
               <small class="text-muted">生のJSONやテキスト</small>
               <div class="d-flex gap-1">
                 <button type="button" class="btn btn-link btn-sm p-0 small text-decoration-none" id="btn-insert-selection">
-                  + selection
+                  + page.selection
                 </button>
                 <button type="button" class="btn btn-link btn-sm p-0 small text-decoration-none" id="btn-insert-url">
                   + page.url
                 </button>
               </div>
             </div>
-            <textarea class="form-control form-control-sm font-monospace" id="action-body-raw" rows="4" placeholder='{\n  "text": "{{selection}}",\n  "url": "{{page.url}}"\n}'></textarea>
+            <textarea class="form-control form-control-sm font-monospace" id="action-body-raw" rows="4" placeholder='{\n  "text": "{{page.selection}}",\n  "url": "{{page.url}}"\n}'></textarea>
           </div>
         </div>
 
@@ -394,11 +394,11 @@ export function setupActionEditor(
     row.className = "input-group input-group-sm body-kv-row";
     row.innerHTML = `
       <input type="text" class="form-control font-monospace body-key" placeholder="Key (e.g. text)" value="" style="max-width: 35%;">
-      <input type="text" class="form-control font-monospace body-val" placeholder="Value (e.g. {{selection}})" value="">
+      <input type="text" class="form-control font-monospace body-val" placeholder="Value (e.g. {{page.selection}})" value="">
       <button type="button" class="btn btn-outline-secondary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false" title="変数を挿入">
       </button>
       <ul class="dropdown-menu dropdown-menu-end small">
-        <li><a class="dropdown-item insert-var" href="#" data-val="{{selection}}">{{selection}} (選択テキスト)</a></li>
+        <li><a class="dropdown-item insert-var" href="#" data-val="{{page.selection}}">{{page.selection}} (選択テキスト)</a></li>
         <li><a class="dropdown-item insert-var" href="#" data-val="{{page.url}}">{{page.url}} (URL)</a></li>
         <li><a class="dropdown-item insert-var" href="#" data-val="{{page.title}}">{{page.title}} (タイトル)</a></li>
         <li><a class="dropdown-item insert-var" href="#" data-val="{{link.url}}">{{link.url}} (リンクURL)</a></li>
@@ -510,7 +510,7 @@ export function setupActionEditor(
   });
 
   btnInsertSelection?.addEventListener("click", () => {
-    insertAtCursor(inputBodyRaw, "{{selection}}");
+    insertAtCursor(inputBodyRaw, "{{page.selection}}");
     if (bodyMode === "raw") {
       syncRawToKv();
     }
@@ -542,10 +542,14 @@ export function setupActionEditor(
     actionInputSection.open = false;
 
     bodyKvRowsContainer.innerHTML = "";
-    createBodyKvRow("text", "{{selection}}");
+    createBodyKvRow("text", "{{page.selection}}");
     createBodyKvRow("url", "{{page.url}}");
 
-    inputBodyRaw.value = JSON.stringify({ text: "{{selection}}", url: "{{page.url}}" }, null, 2);
+    inputBodyRaw.value = JSON.stringify(
+      { text: "{{page.selection}}", url: "{{page.url}}" },
+      null,
+      2,
+    );
     inputTimeoutMs.value = "";
 
     radioBodyKv.checked = true;

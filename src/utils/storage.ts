@@ -38,7 +38,7 @@ export const DEFAULT_ACTIONS: HttpAction[] = [
     },
     body: JSON.stringify(
       {
-        text: "{{selection}}",
+        text: "{{page.selection}}",
         source: "{{page.url}}",
       },
       null,
