@@ -22,8 +22,8 @@ interface PendingMediaContext {
 }
 
 const mediaFallbackMenuContexts = new Map<string, MediaContext[]>();
+const regularMenuContexts = new Map<string, ActionContext[]>();
 let pendingMediaContext: PendingMediaContext | undefined;
-let hasRegularActions = false;
 let mediaMenuStateReady = false;
 let mediaMenuStateRestoring: Promise<void> | undefined;
 
@@ -36,7 +36,7 @@ async function ensureMediaMenuState(): Promise<void> {
       if (mediaMenuStateReady || isUpdatingMenus) return;
 
       mediaFallbackMenuContexts.clear();
-      hasRegularActions = false;
+      regularMenuContexts.clear();
       for (const action of actions) {
         if (!enabled || !action.enabled || getContextMenuContexts(action.triggers).length === 0)
           continue;
@@ -44,7 +44,7 @@ async function ensureMediaMenuState(): Promise<void> {
         if (contexts.length > 0) {
           mediaFallbackMenuContexts.set(`action_${action.id}`, contexts);
         } else {
-          hasRegularActions = true;
+          regularMenuContexts.set(`action_${action.id}`, getContextMenuContexts(action.triggers));
         }
       }
       mediaMenuStateReady = true;
@@ -67,20 +67,38 @@ function isMediaContext(value: unknown): value is MediaContext {
   return value === "video" || value === "audio";
 }
 
+function isRegularMenuVisible(
+  contexts: ActionContext[],
+  context: MediaContext | undefined,
+): boolean {
+  // 「ページ」は動画・音声の指定を兼ねない。他のコンテキストはChromeの判定に任せる。
+  return context === undefined || !contexts.includes("page") || contexts.includes(context);
+}
+
 function updateMediaMenuVisibility(context: MediaContext | undefined): void {
-  if (isUpdatingMenus || mediaFallbackMenuContexts.size === 0) return;
+  if (isUpdatingMenus || (mediaFallbackMenuContexts.size === 0 && regularMenuContexts.size === 0))
+    return;
 
   const hasMatchingMediaAction =
     context !== undefined &&
     [...mediaFallbackMenuContexts.values()].some((contexts) => contexts.includes(context));
+  const hasVisibleRegularAction = [...regularMenuContexts.values()].some((contexts) =>
+    isRegularMenuVisible(contexts, context),
+  );
 
   chrome.contextMenus.update(
     ROOT_MENU_ID,
-    { visible: hasRegularActions || hasMatchingMediaAction },
+    { visible: hasVisibleRegularAction || hasMatchingMediaAction },
     () => {
       void chrome.runtime.lastError;
     },
   );
+
+  for (const [id, contexts] of regularMenuContexts) {
+    chrome.contextMenus.update(id, { visible: isRegularMenuVisible(contexts, context) }, () => {
+      void chrome.runtime.lastError;
+    });
+  }
 
   for (const [id, contexts] of mediaFallbackMenuContexts) {
     chrome.contextMenus.update(
@@ -166,7 +184,7 @@ export async function updateContextMenus(): Promise<void> {
     // First clear existing menus cleanly
     await removeAllMenus();
     mediaFallbackMenuContexts.clear();
-    hasRegularActions = false;
+    regularMenuContexts.clear();
 
     const enabled = await isEnabled();
     if (!enabled) {
@@ -191,7 +209,6 @@ export async function updateContextMenus(): Promise<void> {
       (action) => getActionMediaFallbackContexts(action).length > 0,
     );
 
-    hasRegularActions = regularActions.length > 0;
     const parentContexts = getParentMenuContexts(enabledActions);
     if (mediaActions.length > 0 && !parentContexts.includes(chrome.contextMenus.ContextType.PAGE)) {
       parentContexts.push(chrome.contextMenus.ContextType.PAGE);
@@ -201,7 +218,7 @@ export async function updateContextMenus(): Promise<void> {
       id: ROOT_MENU_ID,
       title: "HTTP Actions",
       contexts: parentContexts,
-      visible: hasRegularActions,
+      visible: regularActions.length > 0,
     });
 
     for (const action of regularActions) {
@@ -213,6 +230,7 @@ export async function updateContextMenus(): Promise<void> {
         title: `${action.method} ${action.name}`,
         contexts: actionContexts.map(mapContextToChrome) as ChromeContextTypes,
       });
+      regularMenuContexts.set(`action_${action.id}`, actionContexts);
     }
 
     for (const action of mediaActions) {
@@ -284,6 +302,12 @@ export async function handleContextMenuClick(
   ) {
     return;
   }
+
+  if (
+    mediaContext &&
+    !isRegularMenuVisible(getContextMenuContexts(action.triggers), mediaContext.context)
+  )
+    return;
 
   // Build page context
   const pageContext: ExecutionPageContext = {
