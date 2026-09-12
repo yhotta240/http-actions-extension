@@ -5,6 +5,7 @@ import { clearMediaRequestCandidates, registerMediaRequestTracking } from "./med
 import { handleRuntimeMessage } from "./messages";
 import { handleContextMenuClick, updateContextMenus } from "./triggers/context-menus";
 import { handlePageLoad } from "./triggers/page-load";
+import { closeExecutionWindows } from "./ui/execution-windows";
 import { openLatestResponsePopup } from "./ui/response-popup";
 
 export { updateContextMenus } from "./triggers/context-menus";
@@ -18,6 +19,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
       `拡張機能がアップデートされました (v${details.previousVersion ?? "?"} → v${chrome.runtime.getManifest().version})`,
       "background",
     );
+    await closeExecutionWindows();
   }
   await updateContextMenus();
 });

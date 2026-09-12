@@ -7,6 +7,7 @@ import type {
 import { getMissingRequiredActionInputs } from "../../utils/action-inputs";
 import { logError } from "../../utils/logger";
 import { getSessionStorage, removeSessionStorage, setSessionStorage } from "../../utils/storage";
+import { rememberExecutionWindow } from "../ui/execution-windows";
 import { executeActionById, findActionById } from "./actions";
 import { failedExecutionResult } from "./result";
 
@@ -45,12 +46,15 @@ async function openExecutionInputPage(
 
   try {
     const inputUrl = `${chrome.runtime.getURL(INPUT_PAGE_PATH)}?requestId=${encodeURIComponent(requestId)}`;
-    await chrome.windows.create({
+    const inputWindow = await chrome.windows.create({
       url: inputUrl,
       type: "popup",
       width: 460,
       height: 560,
     });
+    if (inputWindow?.id !== undefined) {
+      await rememberExecutionWindow(inputWindow.id);
+    }
   } catch (error: unknown) {
     await removeSessionStorage(pendingInputStorageKey(requestId)).catch(() => undefined);
     throw error;
