@@ -70,7 +70,7 @@ function formatResponseHeaders(headers: Record<string, string> | undefined): str
 function createCopyButton(text: string, label: string): HTMLButtonElement {
   const button = document.createElement("button");
   button.type = "button";
-  button.className = "icon-action-btn response-copy-btn ms-auto";
+  button.className = "icon-action-btn response-copy-btn";
   button.title = `${label}をコピー`;
   button.setAttribute("aria-label", `${label}をコピー`);
 
@@ -86,6 +86,43 @@ function createCopyButton(text: string, label: string): HTMLButtonElement {
   });
 
   return button;
+}
+
+function createResponseSection(
+  label: string,
+  text: string,
+  open: boolean,
+  maxHeight?: string,
+  notice?: string,
+): HTMLDetailsElement {
+  const section = document.createElement("details");
+  section.open = open;
+
+  const summary = document.createElement("summary");
+  summary.className = "position-relative pe-4";
+  const labelElement = document.createElement("span");
+  labelElement.textContent = label;
+  summary.appendChild(labelElement);
+
+  const copyButton = createCopyButton(text, label);
+  copyButton.classList.add("position-absolute", "end-0", "top-50", "translate-middle-y");
+  summary.appendChild(copyButton);
+  section.appendChild(summary);
+
+  if (notice) {
+    const noticeElement = document.createElement("div");
+    noticeElement.className = "text-warning small";
+    noticeElement.textContent = notice;
+    section.appendChild(noticeElement);
+  }
+
+  const content = document.createElement("pre");
+  content.className = "small border rounded p-2 mt-1 mb-1 overflow-auto";
+  if (maxHeight) content.style.maxHeight = maxHeight;
+  content.textContent = text;
+  section.appendChild(content);
+
+  return section;
 }
 
 function renderExecutionResult(
@@ -125,44 +162,20 @@ function renderExecutionResult(
   });
   summaryLine.appendChild(detailButton);
 
-  const headersDetails = document.createElement("details");
-  const headersSummary = document.createElement("summary");
-  headersSummary.className = "position-relative pe-4";
-  const headersLabel = document.createElement("span");
-  headersLabel.textContent = "Headers";
-  headersSummary.appendChild(headersLabel);
   const formattedResponseHeaders = formatResponseHeaders(result.responseHeaders);
-  const headersCopyButton = createCopyButton(formattedResponseHeaders, "Headers");
-  headersCopyButton.classList.add("position-absolute", "end-0", "top-50", "translate-middle-y");
-  headersSummary.appendChild(headersCopyButton);
-  headersDetails.appendChild(headersSummary);
-  const responseHeaders = document.createElement("pre");
-  responseHeaders.className = "small border rounded p-2 mt-1 overflow-auto";
-  responseHeaders.textContent = formattedResponseHeaders;
-  headersDetails.appendChild(responseHeaders);
-  details.appendChild(headersDetails);
-
-  const responseHeading = document.createElement("div");
-  responseHeading.className = "d-flex align-items-center gap-2 fw-semibold mt-1";
-  const responseLabel = document.createElement("span");
-  responseLabel.textContent = "Response";
-  responseHeading.appendChild(responseLabel);
   const formattedResponseBody = formatResponseBody(result.responseBody);
-  responseHeading.appendChild(createCopyButton(formattedResponseBody, "Response"));
-  details.appendChild(responseHeading);
-
-  if ("responseBodyTruncated" in result && result.responseBodyTruncated) {
-    const limitMessage = document.createElement("div");
-    limitMessage.className = "text-warning small";
-    limitMessage.textContent = "100KB制限：レスポンスが大きいため一部のみ表示しています";
-    details.appendChild(limitMessage);
-  }
-
-  const responseBody = document.createElement("pre");
-  responseBody.className = "small border rounded p-2 mb-1 mt-1 overflow-auto";
-  responseBody.style.maxHeight = "240px";
-  responseBody.textContent = formattedResponseBody;
-  details.appendChild(responseBody);
+  details.appendChild(createResponseSection("Headers", formattedResponseHeaders, false));
+  details.appendChild(
+    createResponseSection(
+      "Response",
+      formattedResponseBody,
+      true,
+      "240px",
+      "responseBodyTruncated" in result && result.responseBodyTruncated
+        ? "100KB制限：レスポンスが大きいため一部のみ表示しています"
+        : undefined,
+    ),
+  );
 
   container.appendChild(summaryLine);
   container.appendChild(details);
