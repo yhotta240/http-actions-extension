@@ -5,6 +5,7 @@ import { clearMediaRequestCandidates, registerMediaRequestTracking } from "./med
 import { handleRuntimeMessage } from "./messages";
 import { handleContextMenuClick, updateContextMenus } from "./triggers/context-menus";
 import { handlePageLoad } from "./triggers/page-load";
+import { closeExecutionWindows, forgetExecutionWindow } from "./ui/execution-windows";
 import { openLatestResponsePopup } from "./ui/response-popup";
 
 export { updateContextMenus } from "./triggers/context-menus";
@@ -18,12 +19,17 @@ chrome.runtime.onInstalled.addListener(async (details) => {
       `拡張機能がアップデートされました (v${details.previousVersion ?? "?"} → v${chrome.runtime.getManifest().version})`,
       "background",
     );
+    await closeExecutionWindows();
   }
   await updateContextMenus();
 });
 
 chrome.runtime.onStartup?.addListener(async () => {
   await updateContextMenus();
+});
+
+chrome.windows.onRemoved?.addListener((windowId) => {
+  void forgetExecutionWindow(windowId).catch(() => undefined);
 });
 
 // Watch for changes in actions or enabled status to update menus

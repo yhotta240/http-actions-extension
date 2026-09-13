@@ -1,4 +1,5 @@
 import { getLatestExecutionResult } from "../../utils/response-storage";
+import { rememberExecutionWindow } from "./execution-windows";
 
 const RESPONSE_ACTION_ID_PARAM = "responseActionId";
 const EXPAND_RESPONSE_PARAM = "expandResponse";
@@ -38,4 +39,5 @@ export async function openLatestResponsePopup(): Promise<void> {
     throw new Error("レスポンス表示ウィンドウを作成できませんでした");
   }
   responseWindowId = responseWindow.id;
+  await rememberExecutionWindow(responseWindow.id);
 }
