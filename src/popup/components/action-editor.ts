@@ -25,6 +25,7 @@ const PAGE_VARIABLES: VariableOption[] = [
   { template: "{{page.selection}}", label: "{{page.selection}} (選択テキスト)" },
   { template: "{{page.url}}", label: "{{page.url}} (URL)" },
   { template: "{{page.title}}", label: "{{page.title}} (タイトル)" },
+  { template: "{{page.domain}}", label: "{{page.domain}} (ドメイン)" },
   { template: "{{link.url}}", label: "{{link.url}} (リンクURL)" },
   { template: "{{image.url}}", label: "{{image.url}} (画像URL)" },
   { template: "{{video.url}}", label: "{{video.url}} (動画URL)" },
