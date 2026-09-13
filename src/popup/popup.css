@@ -82,6 +82,14 @@ body {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
 }
 
+#action-editor-card.action-editor-editing #editor-title {
+  color: var(--bs-success-text-emphasis);
+}
+
+#action-editor-card.action-editor-editing {
+  border-color: var(--bs-success);
+}
+
 .icon-action-btn {
   width: 28px;
   height: 28px;
