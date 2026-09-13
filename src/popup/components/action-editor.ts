@@ -382,9 +382,19 @@ export function setupActionEditor(
   };
 
   const appendVariable = (target: VariableTarget, template: string): void => {
-    target.value += template;
+    let cursorPosition = target.value.length + template.length;
+
+    if (target instanceof HTMLTextAreaElement) {
+      const start = target.selectionStart ?? target.value.length;
+      const end = target.selectionEnd ?? start;
+      target.value = `${target.value.slice(0, start)}${template}${target.value.slice(end)}`;
+      cursorPosition = start + template.length;
+    } else {
+      target.value += template;
+    }
+
     target.focus();
-    target.setSelectionRange(target.value.length, target.value.length);
+    target.setSelectionRange(cursorPosition, cursorPosition);
     target.dispatchEvent(new Event("input", { bubbles: true }));
   };
 
@@ -394,6 +404,11 @@ export function setupActionEditor(
     target: VariableTarget,
   ): void => {
     renderVariableMenu(menu, {}, {});
+    button.addEventListener("mousedown", (event) => {
+      if (target instanceof HTMLTextAreaElement) {
+        event.preventDefault();
+      }
+    });
     button.addEventListener("click", () => refreshVariableMenu(menu));
     menu.addEventListener("click", (event) => {
       const clickedElement = event.target;
