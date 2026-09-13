@@ -35,9 +35,12 @@ export function setupActionEditor(
   let bodyMode: "kv" | "raw" = "kv";
 
   container.innerHTML = `
-    <div class="card p-3 shadow-sm mb-3">
+    <div class="card p-3 shadow-sm mb-3" id="action-editor-card">
       <div class="d-flex justify-content-between align-items-center mb-2">
-        <h6 class="m-0 fw-bold" id="editor-title">新規アクション作成</h6>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge rounded-pill text-bg-primary" id="editor-mode-badge">新規</span>
+          <h6 class="m-0 fw-bold" id="editor-title">新規アクション作成</h6>
+        </div>
         <button type="button" class="btn btn-sm btn-outline-secondary d-none" id="btn-cancel-edit">
           新規作成に戻る
         </button>
@@ -175,10 +178,13 @@ export function setupActionEditor(
   `;
 
   const form = container.querySelector("#action-form") as HTMLFormElement;
+  const editorCard = container.querySelector("#action-editor-card") as HTMLElement;
+  const editorModeBadge = container.querySelector("#editor-mode-badge") as HTMLElement;
   const editorTitle = container.querySelector("#editor-title") as HTMLElement;
   const btnCancelEdit = container.querySelector("#btn-cancel-edit") as HTMLButtonElement;
   const btnDelete = container.querySelector("#btn-delete") as HTMLButtonElement;
   const btnDuplicate = container.querySelector("#btn-duplicate") as HTMLButtonElement;
+  const btnSave = container.querySelector("#btn-save") as HTMLButtonElement;
 
   const inputName = container.querySelector("#action-name") as HTMLInputElement;
   const selectMethod = container.querySelector("#action-method") as HTMLSelectElement;
@@ -201,6 +207,19 @@ export function setupActionEditor(
       "d-none",
       !hasPageLoad || actionInputsContainer.children.length === 0,
     );
+  }
+
+  function setEditorMode(mode: "create" | "edit"): void {
+    const isEditing = mode === "edit";
+    editorCard.classList.toggle("action-editor-editing", isEditing);
+    editorModeBadge.classList.toggle("text-bg-success", isEditing);
+    editorModeBadge.classList.toggle("text-bg-primary", !isEditing);
+    editorModeBadge.textContent = isEditing ? "編集" : "新規";
+    btnSave.classList.toggle("btn-success", isEditing);
+    btnSave.classList.toggle("btn-primary", !isEditing);
+    btnSave.innerHTML = isEditing
+      ? '<i class="bi bi-check-lg"></i> 更新'
+      : '<i class="bi bi-check-lg"></i> 保存';
   }
 
   // Header Elements
@@ -532,6 +551,7 @@ export function setupActionEditor(
   // ----------------
   const resetForm = () => {
     currentEditingId = null;
+    setEditorMode("create");
     editorTitle.textContent = "新規アクション作成";
     btnCancelEdit.classList.add("d-none");
     btnDelete.classList.add("d-none");
@@ -575,6 +595,7 @@ export function setupActionEditor(
     if (!action) return;
 
     currentEditingId = action.id;
+    setEditorMode("edit");
     editorTitle.textContent = `アクション編集: ${action.name}`;
     btnCancelEdit.classList.remove("d-none");
     btnDelete.classList.remove("d-none");
