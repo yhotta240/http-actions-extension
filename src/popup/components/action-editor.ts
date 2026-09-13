@@ -1,6 +1,6 @@
 import type { ActionInput, HttpAction, HttpMethod } from "../../types/actions";
 import { validateActionInputDefinitions } from "../../utils/action-inputs";
-import { getActions, setActions } from "../../utils/storage";
+import { getActions, getSecrets, getVariables, setActions } from "../../utils/storage";
 import { validateTriggers } from "../../utils/triggers";
 import { setupTriggerEditor } from "./trigger-editor";
 
@@ -14,6 +14,24 @@ const COMMON_HEADERS = [
 ];
 
 type BodyScalarType = "string" | "number" | "boolean";
+type VariableTarget = HTMLInputElement | HTMLTextAreaElement;
+
+interface VariableOption {
+  label: string;
+  template: string;
+}
+
+const PAGE_VARIABLES: VariableOption[] = [
+  { template: "{{page.selection}}", label: "{{page.selection}} (選択テキスト)" },
+  { template: "{{page.url}}", label: "{{page.url}} (URL)" },
+  { template: "{{page.title}}", label: "{{page.title}} (タイトル)" },
+  { template: "{{link.url}}", label: "{{link.url}} (リンクURL)" },
+  { template: "{{image.url}}", label: "{{image.url}} (画像URL)" },
+  { template: "{{video.url}}", label: "{{video.url}} (動画URL)" },
+  { template: "{{video.directUrl}}", label: "{{video.directUrl}} (動画配信URL)" },
+  { template: "{{audio.url}}", label: "{{audio.url}} (音声URL)" },
+  { template: "{{audio.directUrl}}", label: "{{audio.directUrl}} (音声配信URL)" },
+];
 
 function getBodyScalarType(value: unknown): BodyScalarType | undefined {
   if (typeof value === "string") return "string";
@@ -147,13 +165,11 @@ export function setupActionEditor(
           <div id="body-raw-panel" class="d-none mb-2">
             <div class="d-flex justify-content-between align-items-center mb-1">
               <small class="text-muted">生のJSONやテキスト</small>
-              <div class="d-flex gap-1">
-                <button type="button" class="btn btn-link btn-sm p-0 small text-decoration-none" id="btn-insert-selection">
-                  + page.selection
+              <div class="dropdown dropup">
+                <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 small dropdown-toggle variable-menu-toggle" id="btn-insert-body-variable" data-bs-toggle="dropdown" aria-expanded="false">
+                  変数を挿入
                 </button>
-                <button type="button" class="btn btn-link btn-sm p-0 small text-decoration-none" id="btn-insert-url">
-                  + page.url
-                </button>
+                <ul class="dropdown-menu dropdown-menu-end small variable-menu"></ul>
               </div>
             </div>
             <textarea class="form-control form-control-sm font-monospace" id="action-body-raw" rows="4" placeholder='{\n  "text": "{{page.selection}}",\n  "url": "{{page.url}}"\n}'></textarea>
@@ -235,9 +251,12 @@ export function setupActionEditor(
   const bodyKvRowsContainer = container.querySelector("#body-kv-rows-container") as HTMLElement;
   const btnAddBodyKvRow = container.querySelector("#btn-add-body-kv-row") as HTMLButtonElement;
   const inputBodyRaw = container.querySelector("#action-body-raw") as HTMLTextAreaElement;
-
-  const btnInsertSelection = container.querySelector("#btn-insert-selection") as HTMLButtonElement;
-  const btnInsertUrl = container.querySelector("#btn-insert-url") as HTMLButtonElement;
+  const btnInsertBodyVariable = container.querySelector(
+    "#btn-insert-body-variable",
+  ) as HTMLButtonElement;
+  const bodyRawVariableMenu = container.querySelector(
+    "#body-raw-panel .variable-menu",
+  ) as HTMLUListElement;
 
   const createActionInputRow = (input: Partial<ActionInput> = {}) => {
     const row = document.createElement("div");
@@ -285,6 +304,108 @@ export function setupActionEditor(
     });
     return inputs;
   };
+
+  const getRuntimeInputOptions = (): VariableOption[] => {
+    const options: VariableOption[] = [];
+    const keys = new Set<string>();
+
+    actionInputsContainer.querySelectorAll(".action-input-row").forEach((row) => {
+      const key = (row.querySelector(".action-input-key") as HTMLInputElement).value.trim();
+      if (!key || keys.has(key)) return;
+      keys.add(key);
+      options.push({ template: `{{${key}}}`, label: `{{${key}}}` });
+    });
+
+    return options;
+  };
+
+  const appendVariableGroup = (
+    menu: HTMLUListElement,
+    label: string,
+    options: VariableOption[],
+  ): void => {
+    if (options.length === 0) return;
+
+    const header = document.createElement("li");
+    const headerText = document.createElement("h6");
+    headerText.className = "dropdown-header";
+    headerText.textContent = label;
+    header.appendChild(headerText);
+    menu.appendChild(header);
+
+    for (const option of options) {
+      const item = document.createElement("li");
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "dropdown-item";
+      button.dataset.template = option.template;
+      button.textContent = option.label;
+      item.appendChild(button);
+      menu.appendChild(item);
+    }
+  };
+
+  const renderVariableMenu = (
+    menu: HTMLUListElement,
+    variables: Record<string, string>,
+    secrets: Record<string, string>,
+  ): void => {
+    menu.replaceChildren();
+
+    appendVariableGroup(menu, "ページ情報", PAGE_VARIABLES);
+    appendVariableGroup(
+      menu,
+      "Variables",
+      Object.keys(variables).map((key) => ({
+        template: `{{var.${key}}}`,
+        label: `{{var.${key}}}`,
+      })),
+    );
+    appendVariableGroup(
+      menu,
+      "Secrets",
+      Object.keys(secrets).map((key) => ({
+        template: `{{secret.${key}}}`,
+        label: `{{secret.${key}}}`,
+      })),
+    );
+    appendVariableGroup(menu, "実行時入力", getRuntimeInputOptions());
+  };
+
+  const refreshVariableMenu = (menu: HTMLUListElement): void => {
+    renderVariableMenu(menu, {}, {});
+    void Promise.all([getVariables().catch(() => ({})), getSecrets().catch(() => ({}))]).then(
+      ([variables, secrets]) => {
+        renderVariableMenu(menu, variables, secrets);
+      },
+    );
+  };
+
+  const appendVariable = (target: VariableTarget, template: string): void => {
+    target.value += template;
+    target.focus();
+    target.setSelectionRange(target.value.length, target.value.length);
+    target.dispatchEvent(new Event("input", { bubbles: true }));
+  };
+
+  const setupVariableMenu = (
+    button: HTMLButtonElement,
+    menu: HTMLUListElement,
+    target: VariableTarget,
+  ): void => {
+    renderVariableMenu(menu, {}, {});
+    button.addEventListener("click", () => refreshVariableMenu(menu));
+    menu.addEventListener("click", (event) => {
+      const clickedElement = event.target;
+      if (!(clickedElement instanceof HTMLElement)) return;
+
+      const item = clickedElement.closest<HTMLButtonElement>("[data-template]");
+      if (!item) return;
+      appendVariable(target, item.dataset.template ?? "");
+    });
+  };
+
+  setupVariableMenu(btnInsertBodyVariable, bodyRawVariableMenu, inputBodyRaw);
 
   btnAddActionInput.addEventListener("click", () => {
     actionInputSection.open = true;
@@ -372,12 +493,21 @@ export function setupActionEditor(
     row.innerHTML = `
       <input type="text" class="form-control font-monospace header-key" list="common-headers-list" placeholder="Key (e.g. Content-Type)" value="" style="max-width: 40%;">
       <input type="text" class="form-control font-monospace header-val" placeholder="Value (e.g. application/json)" value="">
+      <button type="button" class="btn btn-outline-secondary dropdown-toggle dropdown-toggle-split variable-menu-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="変数を挿入">
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end small variable-menu"></ul>
       <button type="button" class="btn btn-outline-danger btn-remove-row" title="削除">
         <i class="bi bi-x-lg"></i>
       </button>
     `;
+    const valueInput = row.querySelector(".header-val") as HTMLInputElement;
+    valueInput.value = val;
+    setupVariableMenu(
+      row.querySelector(".variable-menu-toggle") as HTMLButtonElement,
+      row.querySelector(".variable-menu") as HTMLUListElement,
+      valueInput,
+    );
     (row.querySelector(".header-key") as HTMLInputElement).value = key;
-    (row.querySelector(".header-val") as HTMLInputElement).value = val;
     row.querySelector(".btn-remove-row")?.addEventListener("click", () => row.remove());
     headersContainer.appendChild(row);
   };
@@ -410,23 +540,13 @@ export function setupActionEditor(
   // ----------------
   const createBodyKvRow = (key = "", val = "", valueType?: BodyScalarType) => {
     const row = document.createElement("div");
-    row.className = "input-group input-group-sm body-kv-row";
+    row.className = "input-group input-group-sm body-kv-row dropup";
     row.innerHTML = `
       <input type="text" class="form-control font-monospace body-key" placeholder="Key (e.g. text)" value="" style="max-width: 35%;">
       <input type="text" class="form-control font-monospace body-val" placeholder="Value (e.g. {{page.selection}})" value="">
-      <button type="button" class="btn btn-outline-secondary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false" title="変数を挿入">
+      <button type="button" class="btn btn-outline-secondary dropdown-toggle dropdown-toggle-split variable-menu-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="変数を挿入">
       </button>
-      <ul class="dropdown-menu dropdown-menu-end small">
-        <li><a class="dropdown-item insert-var" href="#" data-val="{{page.selection}}">{{page.selection}} (選択テキスト)</a></li>
-        <li><a class="dropdown-item insert-var" href="#" data-val="{{page.url}}">{{page.url}} (URL)</a></li>
-        <li><a class="dropdown-item insert-var" href="#" data-val="{{page.title}}">{{page.title}} (タイトル)</a></li>
-        <li><a class="dropdown-item insert-var" href="#" data-val="{{link.url}}">{{link.url}} (リンクURL)</a></li>
-        <li><a class="dropdown-item insert-var" href="#" data-val="{{image.url}}">{{image.url}} (画像URL)</a></li>
-        <li><a class="dropdown-item insert-var" href="#" data-val="{{video.url}}">{{video.url}} (動画URL)</a></li>
-        <li><a class="dropdown-item insert-var" href="#" data-val="{{video.directUrl}}">{{video.directUrl}} (動画配信URL)</a></li>
-        <li><a class="dropdown-item insert-var" href="#" data-val="{{audio.url}}">{{audio.url}} (音声URL)</a></li>
-        <li><a class="dropdown-item insert-var" href="#" data-val="{{audio.directUrl}}">{{audio.directUrl}} (音声配信URL)</a></li>
-      </ul>
+      <ul class="dropdown-menu dropdown-menu-end small variable-menu"></ul>
       <button type="button" class="btn btn-outline-danger btn-remove-kv-row" title="削除">
         <i class="bi bi-x-lg"></i>
       </button>
@@ -437,6 +557,11 @@ export function setupActionEditor(
     keyInput.value = key;
     valInput.value = val;
     if (valueType) row.dataset.valueType = valueType;
+    setupVariableMenu(
+      row.querySelector(".variable-menu-toggle") as HTMLButtonElement,
+      row.querySelector(".variable-menu") as HTMLUListElement,
+      valInput,
+    );
 
     keyInput.addEventListener("input", () => {
       if (bodyMode === "kv") syncKvToRaw();
@@ -445,15 +570,6 @@ export function setupActionEditor(
     valInput.addEventListener("input", () => {
       delete row.dataset.valueType;
       if (bodyMode === "kv") syncKvToRaw();
-    });
-
-    row.querySelectorAll(".insert-var").forEach((item) => {
-      item.addEventListener("click", (e) => {
-        e.preventDefault();
-        const placeholder = item.getAttribute("data-val") || "";
-        valInput.value = placeholder;
-        if (bodyMode === "kv") syncKvToRaw();
-      });
     });
 
     row.querySelector(".btn-remove-kv-row")?.addEventListener("click", () => {
@@ -514,33 +630,7 @@ export function setupActionEditor(
     return obj;
   };
 
-  // ----------------
-  // Raw Mode Cursor Helpers
-  // ----------------
-  const insertAtCursor = (textarea: HTMLTextAreaElement, text: string) => {
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const val = textarea.value;
-    textarea.value = val.substring(0, start) + text + val.substring(end);
-    textarea.selectionStart = textarea.selectionEnd = start + text.length;
-    textarea.focus();
-  };
-
   inputBodyRaw.addEventListener("input", () => {
-    if (bodyMode === "raw") {
-      syncRawToKv();
-    }
-  });
-
-  btnInsertSelection?.addEventListener("click", () => {
-    insertAtCursor(inputBodyRaw, "{{page.selection}}");
-    if (bodyMode === "raw") {
-      syncRawToKv();
-    }
-  });
-
-  btnInsertUrl?.addEventListener("click", () => {
-    insertAtCursor(inputBodyRaw, "{{page.url}}");
     if (bodyMode === "raw") {
       syncRawToKv();
     }
